@@ -417,9 +417,11 @@ def main():
                  archive=[r[:-1] for r in archive.values()], drugs=drugs or [])
     allrows = data['all']
     by_src = collections.Counter(r[11] for r in allrows)
+    kits = sum(r[12] for r in allrows)
     log(f"All items: {sum(r[3] == 'N' for r in allrows)} active of {len(allrows)} Medline item #s "
-        f"({by_src['d']} drug products); category from medline.com {by_src['m']}, inferred "
-        f"{by_src['p'] + by_src['g'] + by_src['d']}, not matched {by_src['u']}")
+        f"({len(allrows) - kits} catalog items, {kits} kits/trays/packs, {by_src['d']} drug products); category from "
+        f"medline.com {by_src['m']}, FDA device type rules {by_src['r']}, product code/GMDN majority "
+        f"{by_src['p'] + by_src['g']}, drug type {by_src['d']}, not matched {by_src['u']}")
     asof = datetime.date.fromisoformat(AS_OF)
     def n_new(days):
         cut = (asof - datetime.timedelta(days=days)).isoformat()
