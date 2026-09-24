@@ -323,36 +323,73 @@ ATTR_CATS = {'Incontinence', 'Skin Care', 'Environmental Services (EVS)', 'Nutri
 ATTR_MAX_SEARCHES = 1500
 
 
-def pull_attrs(catalog):
-    out, n, skipped = {}, 0, 0
-    for nm, cid in catalog['tops']:
-        if nm not in ATTR_CATS:
-            continue
-        first = mq('category', cid, 0, 1, 'Manufacturer:MEDLINE'); n += 1
-        for f in first.get('facets') or []:
-            fname = f.get('facetName') or ''
-            if f.get('isCategoryFacet') or fname in ('Category', 'Manufacturer'):
+class Pushback(Exception):
+    pass
+
+
+def pull_attrs(catalog, prev):
+    """A failed search skips just that filter value. Five failures in a row looks like medline.com pushing back:
+    stop there and keep what was collected, topped up with last run's attributes for untouched categories."""
+    out, n, skipped, failed, streak, done = {}, 0, 0, 0, 0, set()
+
+    def search(cid, start, n_rec, facets):
+        nonlocal n, failed, streak
+        n += 1
+        try:
+            b = mq('category', cid, start, n_rec, facets)
+            streak = 0
+            return b
+        except Exception:
+            failed += 1; streak += 1
+            if streak >= 5:
+                raise Pushback()
+            time.sleep(5)
+            return None
+
+    try:
+        for nm, cid in catalog['tops']:
+            if nm not in ATTR_CATS:
                 continue
-            for v in f.get('facetValues') or []:
-                val, cnt = v.get('name') or '', int(v.get('count') or 0)
-                if not val or ',' in val or not cnt or n >= ATTR_MAX_SEARCHES:
+            first = search(cid, 0, 1, 'Manufacturer:MEDLINE')
+            if not first:
+                continue
+            for f in first.get('facets') or []:
+                fname = f.get('facetName') or ''
+                if f.get('isCategoryFacet') or fname in ('Category', 'Manufacturer'):
                     continue
-                start, total = 0, 1
-                while start < total:
-                    b = mq('category', cid, start, 200, f'Manufacturer:MEDLINE,{fname}:{val}'); n += 1
-                    total = int(b.get('totalNumRecords') or 0)
-                    if total > cnt * 1.5 + 5:   # filter ignored by the API: don't tag every product with it
-                        skipped += 1; break
-                    prods = b.get('products') or []
-                    for p in prods:
-                        if (p.get('manufacturer') or '').upper() == 'MEDLINE':
-                            out.setdefault(p['productId'], {}).setdefault(fname, []).append(val)
-                    start += 200
-                    if not prods:
-                        break
+                for v in f.get('facetValues') or []:
+                    val, cnt = v.get('name') or '', int(v.get('count') or 0)
+                    if not val or ',' in val or not cnt or n >= ATTR_MAX_SEARCHES:
+                        continue
+                    start, total = 0, 1
+                    while start < total:
+                        b = search(cid, start, 200, f'Manufacturer:MEDLINE,{fname}:{val}')
+                        if not b:
+                            break
+                        total = int(b.get('totalNumRecords') or 0)
+                        if total > cnt * 1.5 + 5:   # filter ignored by the API: don't tag every product with it
+                            skipped += 1; break
+                        prods = b.get('products') or []
+                        for p in prods:
+                            if (p.get('manufacturer') or '').upper() == 'MEDLINE':
+                                out.setdefault(p['productId'], {}).setdefault(fname, []).append(val)
+                        start += 200
+                        if not prods:
+                            break
+                        time.sleep(1)
                     time.sleep(1)
-                time.sleep(1)
-    log(f'Attributes: {len(out)} products tagged in {len(ATTR_CATS)} categories ({n} searches, {skipped} filters skipped)')
+            done.add(cid)
+        stopped = ''
+    except Pushback:
+        stopped = '; stopped after 5 failed searches in a row'
+    # categories not finished this run keep last run's attributes
+    fam_cat = {p[0]: cid for _, cid in catalog['tops'] for p in catalog['fams'].get(cid, [])}
+    kept = 0
+    for fid, a in (prev or {}).items():
+        if fid not in out and fam_cat.get(fid) not in done:
+            out[fid] = a; kept += 1
+    log(f'Attributes: {len(out)} products tagged ({kept} kept from last run) in {len(done)} of {len(ATTR_CATS)} '
+        f'categories ({n} searches, {failed} failed, {skipped} filters skipped{stopped})')
     return out
 
 
@@ -444,7 +481,7 @@ def main():
     attrs = state.get('attrs') or {}
     if catalog and os.environ.get('SKIP_CATALOG') != '1' and os.environ.get('SKIP_ATTRS') != '1':
         try:
-            attrs = pull_attrs(catalog)
+            attrs = pull_attrs(catalog, attrs)
         except Exception as e:
             log(f'Attributes failed ({type(e).__name__}: {str(e)[:80]}); keeping previous attributes')
     coo = state.get('coo')
