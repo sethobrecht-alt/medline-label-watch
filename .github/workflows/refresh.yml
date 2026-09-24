@@ -1,0 +1,40 @@
+name: Monthly data refresh
+
+on:
+  schedule:
+    - cron: "0 12 1 * *"   # 1st of each month, 12:00 UTC (8am ET)
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: "As-of date (YYYY-MM-DD). Leave blank for today."
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r pipeline/requirements.txt
+      - name: Pull sources and rebuild encrypted data
+        env:
+          LABEL_WATCH_PASSCODE: ${{ secrets.LABEL_WATCH_PASSCODE }}
+          AS_OF: ${{ github.event.inputs.as_of }}
+        run: python pipeline/refresh.py
+      - name: Commit updated data
+        run: |
+          git config user.name "label-watch-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data.enc.json state/state.enc.json
+          git diff --cached --quiet || git commit -m "Data refresh $(date -u +%Y-%m-%d)"
+          git push

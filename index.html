@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231C6E8C'/%3E%3Cpath d='M8 22V10h4v9h6v3z' fill='white'/%3E%3C/svg%3E">
+<title>Medline Label Watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="vendor/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ground:#F3F5F4; --panel:#FFFFFF; --ink:#16242B; --ink-2:#4A5B63; --ink-3:#7A8A91;
+  --rule:#D9E0DE; --rule-2:#E8EDEB; --accent:#1C6E8C; --accent-soft:#E2EFF4; --accent-ink:#0F4F66;
+  --new:#2E7D4F; --new-soft:#E3F2E8; --gone:#A8621A; --gone-soft:#F7ECDD; --bar:#9CC4D3;
+  --shadow:0 1px 2px rgba(22,36,43,.06),0 4px 16px rgba(22,36,43,.05);
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif; --body:"IBM Plex Sans","Segoe UI",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  color-scheme:dark; --ground:#0F171B; --panel:#162228; --ink:#E4ECEE; --ink-2:#A9B8BE; --ink-3:#7D8E95;
+  --rule:#2A3A41; --rule-2:#21313A; --accent:#5FB2CF; --accent-soft:#1B3642; --accent-ink:#9BD3E6;
+  --new:#6CC592; --new-soft:#173327; --gone:#E0A15C; --gone-soft:#3A2A17; --bar:#2F6478; --shadow:none;}}
+:root[data-theme="dark"]{
+  color-scheme:dark; --ground:#0F171B; --panel:#162228; --ink:#E4ECEE; --ink-2:#A9B8BE; --ink-3:#7D8E95;
+  --rule:#2A3A41; --rule-2:#21313A; --accent:#5FB2CF; --accent-soft:#1B3642; --accent-ink:#9BD3E6;
+  --new:#6CC592; --new-soft:#173327; --gone:#E0A15C; --gone-soft:#3A2A17; --bar:#2F6478; --shadow:none;}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;padding-inline:16px}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--mono)}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+
+/* gate */
+#gate{min-height:70vh;display:grid;place-items:center}
+.gate-card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:28px;width:min(380px,100%);box-shadow:var(--shadow);display:grid;gap:14px}
+.gate-card h1{font-size:26px;font-weight:800;letter-spacing:-.01em}
+.gate-card input{width:100%;padding:10px 12px;border:1px solid var(--rule);border-radius:6px;background:var(--ground);color:var(--ink);font:inherit}
+.btn{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px;padding:9px 14px;font-weight:600;cursor:pointer}
+:root[data-theme="dark"] .btn{color:#0F171B}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn{color:#0F171B}}
+.btn.ghost{background:transparent;color:var(--accent-ink);border-color:var(--rule)}
+.btn:disabled{opacity:.5;cursor:default}
+.err{color:var(--gone);font-size:13px;min-height:1em}
+
+/* header */
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:12px}
+.brand h1{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.brand h1 span{color:var(--accent)}
+.brand p{margin:6px 0 0;color:var(--ink-2)}
+.asof{text-align:right;font-size:12px;color:var(--ink-2)}
+.asof b{font-family:var(--mono);color:var(--ink);font-weight:500}
+nav.tabs{display:flex;gap:4px;margin-top:14px;border-bottom:1px solid var(--rule);overflow-x:auto}
+nav.tabs button{background:none;border:none;border-bottom:3px solid transparent;padding:10px 14px;font-family:var(--display);font-weight:600;font-size:15px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+section.view{padding-top:20px}
+
+/* callouts */
+.callouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.callouts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.callout{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:14px 16px;text-align:left;cursor:pointer;display:grid;gap:2px;position:relative}
+.callout:hover{border-color:var(--accent)}
+.callout[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
+.callout .n{font-family:var(--display);font-size:40px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+.callout .lbl{font-weight:600}
+.callout .sub{font-size:12px;color:var(--ink-3)}
+.callout.gone .n{color:var(--gone)}
+.callout.gone[aria-pressed="true"]{background:var(--gone-soft);border-color:var(--gone);box-shadow:inset 0 0 0 1px var(--gone)}
+.hint{color:var(--ink-2);font-size:13px;margin:14px 0 8px}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:18px 0 10px}
+.toolbar h2{font-size:18px;font-weight:700}
+.search{padding:8px 10px;border:1px solid var(--rule);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;width:min(300px,100%)}
+
+/* category list */
+.cats{background:var(--panel);border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.cat{border-top:1px solid var(--rule-2)}
+.cat:first-child{border-top:none}
+.cat>button{width:100%;display:grid;grid-template-columns:18px minmax(0,1.3fr) minmax(0,2fr) 56px;gap:12px;align-items:center;padding:11px 14px;background:none;border:none;text-align:left;cursor:pointer}
+.cat>button:hover{background:var(--rule-2)}
+.chev{transition:transform .15s;color:var(--ink-3)}
+.cat.open>button .chev{transform:rotate(90deg)}
+.cname{font-weight:600}
+.cname small{display:block;font-weight:400;color:var(--ink-3);font-size:12px}
+.track{height:10px;background:var(--rule-2);border-radius:5px;overflow:hidden}
+.fill{height:100%;background:var(--bar);border-radius:5px}
+.gone-mode .fill{background:var(--gone);opacity:.55}
+.cnt{text-align:right;font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums}
+.catbody{padding:4px 14px 16px 44px;display:grid;gap:14px}
+@media (max-width:600px){.catbody{padding-left:14px}.cat>button{grid-template-columns:18px minmax(0,1fr) 44px}.cat>button .track{display:none}}
+.subhead{display:flex;justify-content:space-between;gap:8px;align-items:baseline;border-bottom:1px solid var(--rule-2);padding-bottom:4px}
+.subhead h3{font-family:var(--body);font-size:13px;font-weight:600}
+.subhead span{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--rule-2);vertical-align:top}
+td.item{font-family:var(--mono);white-space:nowrap;color:var(--accent-ink)}
+td.date{font-family:var(--mono);white-space:nowrap;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap}
+.chip.none{background:var(--rule-2);color:var(--ink-3);font-family:var(--body)}
+.pill{font-size:11px;padding:1px 7px;border-radius:10px;white-space:nowrap}
+.pill.inf{background:var(--rule-2);color:var(--ink-2)}
+.muted{color:var(--ink-3)}
+.empty{padding:22px;color:var(--ink-2)}
+
+/* portfolio */
+.pgrid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.pgrid{grid-template-columns:1fr}}
+.plist{background:var(--panel);border:1px solid var(--rule);border-radius:8px;max-height:640px;overflow-y:auto}
+.plist button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--rule-2);padding:10px 14px;cursor:pointer}
+.plist button:first-child{border-top:none}
+.plist button:hover{background:var(--rule-2)}
+.plist button[aria-selected="true"]{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.plist .pn{font-weight:600}
+.plist .pc{font-family:var(--mono);font-size:12px;color:var(--ink-2);text-align:right}
+.plist .pm{grid-column:1/-1;font-size:12px;color:var(--ink-3);display:flex;gap:10px}
+.plist .pm .nw{color:var(--new)} .plist .pm .gn{color:var(--gone)}
+.pdetail{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:18px;display:grid;gap:16px;min-width:0}
+.pdetail h2{font-size:24px;font-weight:800}
+.stats{display:flex;flex-wrap:wrap;gap:22px}
+.stat .v{font-family:var(--display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .k{font-size:12px;color:var(--ink-3)}
+.dl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dlnote{font-size:12px;color:var(--ink-3)}
+.subbars{display:grid;gap:6px}
+.subbar{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) 44px;gap:10px;align-items:center;font-size:13px}
+.subbar .cnt{font-size:12px}
+.method{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:22px;display:grid;gap:16px;max-width:820px}
+.method h2{font-size:20px}
+.method dl{display:grid;grid-template-columns:170px minmax(0,1fr);gap:10px 18px;margin:0}
+@media (max-width:600px){.method dl{grid-template-columns:1fr}}
+.method dt{font-weight:600}
+.method dd{margin:0;color:var(--ink-2)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--ground);padding:9px 14px;border-radius:6px;font-size:13px}
+@media (prefers-reduced-motion: reduce){.chev{transition:none}}
+</style>
+<style>html{color-scheme:light}body{margin:0;padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <div id="gate">
+    <form class="gate-card" id="gateForm" autocomplete="off">
+      <div class="eyebrow">Medline private label</div>
+      <h1>Label Watch</h1>
+      <label for="pass" class="muted">Enter the team passcode to continue.</label>
+      <input id="pass" type="password" placeholder="Passcode" autocomplete="current-password">
+      <button class="btn" type="submit">Open tracker</button>
+      <div class="err" id="gateErr"></div>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <header class="top">
+      <div class="brand">
+        <div class="eyebrow">Medline Industries · private-label portfolio</div>
+        <h1>Label <span>Watch</span></h1>
+        <p>New Medline-brand item numbers, where Medline files them, and where they're made.</p>
+      </div>
+      <div class="asof">Data as of <b id="asof">…</b><br>Refreshes on the 1st of each month</div>
+    </header>
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-new" aria-selected="true" data-view="new">New SKUs</button>
+      <button role="tab" id="tab-port" aria-selected="false" data-view="port">Portfolio Checker</button>
+      <button role="tab" id="tab-how" aria-selected="false" data-view="how">How it works</button>
+    </nav>
+
+    <section class="view" id="view-new">
+      <div class="callouts" id="callouts"></div>
+      <p class="hint" id="hint"></p>
+      <div class="toolbar">
+        <h2 id="catTitle">By Medline category</h2>
+        <input class="search" id="q" type="search" placeholder="Filter by item # or description">
+      </div>
+      <div class="cats" id="cats"></div>
+    </section>
+
+    <section class="view" id="view-port" hidden>
+      <div class="pgrid">
+        <div>
+          <input class="search" id="pq" type="search" placeholder="Find a category" style="width:100%;margin-bottom:8px">
+          <div class="plist" id="plist" role="listbox" aria-label="Medline categories"></div>
+        </div>
+        <div class="pdetail" id="pdetail"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-how" hidden>
+      <div class="method">
+        <h2>Where the numbers come from</h2>
+        <dl id="methodList"></dl>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const CC = {US:"United States",MX:"Mexico",CN:"China",DO:"Dominican Rep.",VN:"Vietnam",MM:"Myanmar",PK:"Pakistan",MT:"Malta",NL:"Netherlands",SV:"El Salvador",KH:"Cambodia",ID:"Indonesia",TW:"Taiwan",IN:"India",TH:"Thailand",CA:"Canada",DE:"Germany",IE:"Ireland",LK:"Sri Lanka",MY:"Malaysia",SE:"Sweden"};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let DATA = null, state = { win: 30, mode: "new", q: "", open: new Set(), port: null, pq: "" };
+
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function decryptData(pass){
+  const env = await (await fetch("data.enc.json", {cache: "no-cache"})).json();
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({name: "PBKDF2", hash: "SHA-256", salt: b64(env.salt), iterations: env.iter}, base, {name: "AES-GCM", length: 256}, false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({name: "AES-GCM", iv: b64(env.iv)}, key, b64(env.ct));
+  const text = await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+  return JSON.parse(text);
+}
+async function tryUnlock(pass, quiet){
+  const btn = $("#gateForm button"); btn.disabled = true; btn.textContent = "Unlocking…";
+  try { DATA = await decryptData(pass); try { sessionStorage.setItem("lw-pass", pass); } catch(e){} openApp(); }
+  catch(e){ if (!quiet) $("#gateErr").textContent = "That passcode doesn't match. Check with the site owner."; }
+  finally { btn.disabled = false; btn.textContent = "Open tracker"; }
+}
+$("#gateForm").addEventListener("submit", e => { e.preventDefault(); tryUnlock($("#pass").value.trim()); });
+try { const p = sessionStorage.getItem("lw-pass"); if (p) tryUnlock(p, true); } catch(e){}
+
+async function openApp(){
+  $("#gate").hidden = true; $("#app").hidden = false;
+  $("#asof").textContent = DATA.asOf;
+  renderNew(); renderPortfolioList(); renderMethod();
+}
+
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("nav.tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  ["new","port","how"].forEach(v => $("#view-"+v).hidden = v !== b.dataset.view);
+}));
+
+const dayDiff = (a,b) => (new Date(a) - new Date(b)) / 86400000;
+function inWindow(r, days, mode){
+  if (mode === "new") return r.status === "N" && dayDiff(DATA.asOf, r.pub) <= days;
+  return r.status === "D" && (!r.end || dayDiff(DATA.asOf, r.end) <= days);
+}
+function uniqItems(rows){ const m = new Map(); rows.forEach(r => { if (!m.has(r.item)) m.set(r.item, r); }); return [...m.values()]; }
+
+function renderCallouts(){
+  const cfg = [[30,"new"],[60,"new"],[90,"new"],[90,"gone"]];
+  $("#callouts").innerHTML = cfg.map(([d,m]) => {
+    const n = uniqItems(DATA.skus.filter(r => inWindow(r,d,m==="new"?"new":"gone"))).length;
+    const on = state.win===d && state.mode===(m==="new"?"new":"gone");
+    return `<button class="callout ${m==="gone"?"gone":""}" aria-pressed="${on}" data-d="${d}" data-m="${m==="new"?"new":"gone"}">
+      <span class="eyebrow">${m==="new" ? "Last "+d+" days" : "Last 90 days"}</span>
+      <span class="n">${n}</span>
+      <span class="lbl">${m==="new" ? "New SKUs added" : "SKUs left distribution"}</span>
+      <span class="sub">${m==="new" ? "Newly published Medline item #s" : "Marked not in commercial distribution"}</span></button>`;
+  }).join("");
+  document.querySelectorAll(".callout").forEach(b => b.addEventListener("click", () => { state.win=+b.dataset.d; state.mode=b.dataset.m; state.open.clear(); renderNew(); }));
+}
+
+function renderNew(){
+  renderCallouts();
+  const rows = uniqItems(DATA.skus.filter(r => inWindow(r, state.win, state.mode)));
+  const q = state.q.toLowerCase();
+  const shown = q ? rows.filter(r => (r.item+" "+r.desc+" "+r.brand+" "+r.top+" "+r.sub).toLowerCase().includes(q)) : rows;
+  $("#hint").textContent = state.mode==="new"
+    ? `Showing ${shown.length} new item numbers from the last ${state.win} days. Pick a category to see its subcategories and items.`
+    : `Showing ${shown.length} item numbers Medline marked as no longer in commercial distribution in the last 90 days.`;
+  $("#catTitle").textContent = state.mode==="new" ? "New SKUs by Medline category" : "Exits by Medline category";
+  const byCat = {};
+  shown.forEach(r => (byCat[r.top] = byCat[r.top] || []).push(r));
+  const cats = Object.entries(byCat).sort((a,b) => (a[0].startsWith("Not yet") - b[0].startsWith("Not yet")) || b[1].length - a[1].length);
+  const max = Math.max(1, ...cats.map(c => c[1].length));
+  $("#cats").className = "cats" + (state.mode==="gone" ? " gone-mode" : "");
+  if (!cats.length){ $("#cats").innerHTML = '<div class="empty">No items match this view.</div>'; return; }
+  $("#cats").innerHTML = cats.map(([name, list]) => {
+    const subs = new Set(list.map(r => r.sub || "Unassigned")).size;
+    const open = state.open.has(name) || !!q;
+    return `<div class="cat ${open?"open":""}" data-cat="${esc(name)}">
+      <button aria-expanded="${open}"><span class="chev">▸</span>
+        <span class="cname">${esc(name)}<small>${subs} subcategor${subs===1?"y":"ies"}${name.startsWith("Not yet")?" · grouped by FDA device type":""}</small></span>
+        <span class="track"><span class="fill" style="width:${(list.length/max*100).toFixed(1)}%"></span></span>
+        <span class="cnt">${list.length}</span></button>
+      ${open ? catBody(list) : ""}</div>`;
+  }).join("");
+  document.querySelectorAll(".cat>button").forEach(b => b.addEventListener("click", () => {
+    const n = b.parentElement.dataset.cat; state.open.has(n) ? state.open.delete(n) : state.open.add(n); renderNew();
+  }));
+}
+
+function cooCell(r){
+  if (!r.coo.length) return '<span class="chip none">Not in FDA listings</span>';
+  return `<div class="chips" title="${esc(r.sites.join("\n"))}">${r.coo.map(c => `<span class="chip">${esc(CC[c]||c)}</span>`).join("")}</div>`;
+}
+function catBody(list){
+  const bySub = {};
+  list.forEach(r => (bySub[r.sub || "Unassigned"] = bySub[r.sub || "Unassigned"] || []).push(r));
+  return `<div class="catbody">` + Object.entries(bySub).sort((a,b)=>b[1].length-a[1].length).map(([sub, items]) => `
+    <div><div class="subhead"><h3>${esc(sub)}</h3><span>${items.length} item${items.length===1?"":"s"}</span></div>
+    <div class="tblwrap"><table><thead><tr><th>Item #</th><th>Description</th><th>${state.mode==="new"?"Published":"Left dist."}</th><th>Brand</th><th>Country of origin*</th><th>Category source</th></tr></thead><tbody>
+    ${items.sort((a,b)=>(state.mode==="new"?b.pub.localeCompare(a.pub):(b.end||"").localeCompare(a.end||""))).map(r => `<tr>
+      <td class="item">${esc(r.item)}</td><td>${esc(r.desc)}<div class="muted" style="font-size:12px">${esc(r.fname || r.gmdn)}</div></td>
+      <td class="date">${esc(state.mode==="new"?r.pub:(r.end||"—"))}</td><td>${esc(r.brand)}</td><td>${cooCell(r)}</td>
+      <td>${r.catSrc==="medline.com"?'<span class="pill inf" style="background:var(--new-soft);color:var(--new)">medline.com</span>':`<span class="pill inf">${esc(r.catSrc.startsWith("inferred")?"inferred":"not listed")}</span>`}</td></tr>`).join("")}
+    </tbody></table></div></div>`).join("") +
+    `<p class="muted" style="font-size:12px;margin:0">*Countries where FDA-registered Medline or contract sites make this device type (FDA product code). Hover for site names. Medline does not publish origin by item.</p></div>`;
+}
+$("#q").addEventListener("input", e => { state.q = e.target.value; renderNew(); });
+
+/* ---------- Portfolio ---------- */
+function catSkus(name, mode){ return uniqItems(DATA.skus.filter(r => r.top === name && inWindow(r, 90, mode))); }
+function renderPortfolioList(){
+  const q = state.pq.toLowerCase();
+  const list = DATA.portfolio.filter(p => !q || p.name.toLowerCase().includes(q));
+  $("#plist").innerHTML = list.map(p => {
+    const nw = catSkus(p.name,"new").length, gn = catSkus(p.name,"gone").length;
+    return `<button role="option" aria-selected="${state.port===p.id}" data-id="${p.id}">
+      <span class="pn">${esc(p.name)}</span><span class="pc">${p.fams.length.toLocaleString()} families</span>
+      <span class="pm"><span class="nw">+${nw} new (90d)</span><span class="gn">−${gn} exits</span></span></button>`;
+  }).join("");
+  document.querySelectorAll("#plist button").forEach(b => b.addEventListener("click", () => { state.port = b.dataset.id; renderPortfolioList(); renderPortfolioDetail(); }));
+  if (!state.port && list.length){ state.port = list.find(p=>p.name==="Lab Supplies")?.id || list[0].id; renderPortfolioList(); renderPortfolioDetail(); }
+}
+$("#pq").addEventListener("input", e => { state.pq = e.target.value; renderPortfolioList(); });
+
+function renderPortfolioDetail(){
+  const p = DATA.portfolio.find(x => x.id === state.port); if (!p) return;
+  const nw = catSkus(p.name,"new"), gn = catSkus(p.name,"gone");
+  const deep = DATA.deep[p.name];
+  const maxSub = Math.max(1, ...p.subs.map(s=>s[1]));
+  $("#pdetail").innerHTML = `
+    <div><div class="eyebrow">Medline category</div><h2>${esc(p.name)}</h2></div>
+    <div class="stats">
+      <div class="stat"><div class="v">${p.fams.length.toLocaleString()}</div><div class="k">Medline-brand product families</div></div>
+      <div class="stat"><div class="v">${p.subs.length}</div><div class="k">Subcategories</div></div>
+      <div class="stat"><div class="v" style="color:var(--new)">+${nw.length}</div><div class="k">New SKUs, last 90 days</div></div>
+      <div class="stat"><div class="v" style="color:var(--gone)">−${gn.length}</div><div class="k">Left distribution, 90 days</div></div>
+    </div>
+    <div class="dl">
+      <button class="btn" id="dlx">Download Excel</button>
+      <button class="btn ghost" id="dlc">Download CSV for Google Sheets</button>
+      <span class="dlnote">Excel includes families, new SKUs, exits, manufacturing sites${deep?" and the item-level deep dive":""}.</span>
+    </div>
+    <div><div class="subhead"><h3>Families by subcategory</h3><span>Medline-brand families</span></div>
+      <div class="subbars" style="margin-top:8px">${p.subs.map(s => `<div class="subbar"><span>${esc(s[0])}</span><span class="track"><span class="fill" style="width:${(s[1]/maxSub*100).toFixed(1)}%"></span></span><span class="cnt">${s[1]}</span></div>`).join("")}</div></div>
+    <div><div class="subhead"><h3>Product families</h3><span id="famCount"></span></div>
+      <input class="search" id="fq" type="search" placeholder="Filter families" style="margin:8px 0">
+      <div class="tblwrap" style="max-height:420px;overflow-y:auto"><table><thead><tr><th>Family ID</th><th>Product family</th><th>Subcategory</th></tr></thead><tbody id="famRows"></tbody></table></div></div>`;
+  const drawFams = () => {
+    const q = ($("#fq").value||"").toLowerCase();
+    const f = p.fams.filter(x => !q || (x[1]+" "+x[2]+" "+x[0]).toLowerCase().includes(q));
+    $("#famCount").textContent = `${f.length.toLocaleString()} of ${p.fams.length.toLocaleString()}`;
+    $("#famRows").innerHTML = f.slice(0,400).map(x => `<tr><td class="item"><a href="https://www.medline.com/jump/product/x/${esc(x[0])}" target="_blank" rel="noopener" style="color:inherit">${esc(x[0])}</a></td><td>${esc(x[1])}</td><td class="muted">${esc(x[2]||"—")}</td></tr>`).join("") + (f.length>400?`<tr><td colspan="3" class="muted">Showing the first 400. The download has all ${f.length.toLocaleString()}.</td></tr>`:"");
+  };
+  drawFams(); $("#fq").addEventListener("input", drawFams);
+  $("#dlx").addEventListener("click", () => download(p, "xlsx"));
+  $("#dlc").addEventListener("click", () => download(p, "csv"));
+}
+
+function skuSheet(rows, mode){
+  return [["Item #","Description","Brand",mode==="new"?"GUDID Publish Date":"Left Distribution Date","Medline Category","Subcategory","Product Family ID","Product Family","Category Source","FDA Product Code","FDA Device Type","GMDN Term","Units per Pack","Country of Origin (FDA-listed sites)","Manufacturing Sites (FDA-listed)","Device ID (GTIN)"]]
+    .concat(rows.map(r => [r.item,r.desc,r.brand,mode==="new"?r.pub:r.end,r.top,r.sub,r.fid,r.fname,r.catSrc,r.pc,r.pcn,r.gmdn,r.units,r.coo.map(c=>CC[c]||c).join(", "),r.sites.join("; "),r.di]));
+}
+function buildRows(p){
+  const nw = catSkus(p.name,"new"), gn = catSkus(p.name,"gone");
+  const fams = [["Family ID","Product Family","Subcategory","medline.com URL"]].concat(p.fams.map(f => [f[0],f[1],f[2],"https://www.medline.com/jump/product/x/"+f[0]]));
+  const sites = {}; nw.concat(gn).forEach(r => r.sites.forEach(s => (sites[r.pc+"|"+s] = [r.pc, r.pcn, s])));
+  const siteRows = [["FDA Product Code","FDA Device Type","Manufacturing Site (country)"]].concat(Object.values(sites));
+  const summary = [["Medline Label Watch — "+p.name],["Data as of",DATA.asOf],["Medline-brand product families",p.fams.length],["Subcategories",p.subs.length],["New SKUs (last 90 days)",nw.length],["SKUs that left distribution (last 90 days)",gn.length],[],["Subcategory","Families"]].concat(p.subs.map(s=>[s[0],s[1]])).concat([[],["Sources"]]).concat(Object.entries(DATA.sources).map(([k,v])=>[k,v]));
+  return {summary, fams, nw: skuSheet(nw,"new"), gn: skuSheet(gn,"gone"), siteRows, deep: DATA.deep[p.name]};
+}
+async function download(p, fmt){
+  const dl = { save: async ({filename, data}) => {
+    const blob = data instanceof Blob ? data : new Blob([data], {type: "text/csv;charset=utf-8"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }};
+  const R = buildRows(p); const base = "Medline_" + p.name.replace(/[^A-Za-z0-9]+/g,"_") + "_" + DATA.asOf;
+  try {
+    if (fmt === "xlsx"){
+      if (!window.XLSX){ toast("The spreadsheet library didn't load. Try the CSV."); return; }
+      const wb = XLSX.utils.book_new();
+      const add = (rows, name, widths) => { const ws = XLSX.utils.aoa_to_sheet(rows); if (widths) ws["!cols"] = widths.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb, ws, name); };
+      add(R.summary, "Summary", [44,60]);
+      add(R.fams, "Product Families", [16,60,34,50]);
+      add(R.nw, "New SKUs (90d)", [16,50,14,14,24,28,16,40,22,10,34,34,8,30,70,18]);
+      add(R.gn, "Left Distribution (90d)", [16,50,14,14,24,28,16,40,22,10,34,34,8,30,70,18]);
+      add(R.siteRows, "Manufacturing Sites", [12,40,70]);
+      if (R.deep) add([R.deep.cols].concat(R.deep.rows), "Deep Dive", R.deep.cols.map(()=>18));
+      const buf = XLSX.write(wb, {bookType:"xlsx", type:"array"});
+      await dl.save({filename: base + ".xlsx", data: new Blob([buf])});
+    } else {
+      const rows = [["Record Type"].concat(R.nw[0])];
+      R.nw.slice(1).forEach(r => rows.push(["New SKU"].concat(r)));
+      R.gn.slice(1).forEach(r => rows.push(["Left distribution"].concat(r)));
+      R.fams.slice(1).forEach(f => rows.push(["Product family", "", f[1], "MEDLINE", "", p.name, f[2], f[0], f[1]]));
+      const csv = rows.map(r => r.map(v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; }).join(",")).join("\n");
+      await dl.save({filename: base + ".csv", data: csv});
+    }
+    toast("Downloaded " + base + "." + fmt);
+  } catch(e){
+    if (e && e.code === "declined") return;
+    toast(e && e.code === "rate_limited" ? "A save prompt is already open." : "The file couldn't be saved here.");
+  }
+}
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 3200); }
+
+function renderMethod(){
+  const items = [
+    ["New SKU", "A Medline Industries item number whose device record was first published to FDA's Global Unique Device Identification Database (GUDID) inside the window. Medline must publish a record before a regulated item ships, so this is the earliest public launch signal. Counted once per item #."],
+    ["Left distribution", "An item # whose GUDID record Medline changed to “Not in commercial distribution”. This is the public discontinuation signal."],
+    ["Medline category", "Each item # is looked up in medline.com's catalog search to find its Medline product family and category. Items not yet on medline.com get the category most common for their FDA product code (shown as “inferred”); items with no match at all are grouped under “Not yet on medline.com” by device type."],
+    ["Country of origin", "Medline does not publish origin by item. We show countries where FDA-registered Medline plants or contract manufacturers are listed for that FDA product code. Treat it as the likely origin, not a label claim."],
+    ["Portfolio", "Every Medline-brand product family on medline.com, by Medline's 26 top-level categories and their subcategories. Families are Medline's product pages; one family usually holds several item #s."],
+    ["Deep dives", "Lab Supplies and Beds & Mattresses downloads include item-level work: specimen collection items with Medline at Home retail prices, and the electric bed SKU master with recalls."],
+    ["Refresh", "Rebuilt on the 1st of each month from the latest FDA release files and a new medline.com crawl."],
+    ["Sources", Object.values(DATA.sources).join(" ")],
+  ];
+  $("#methodList").innerHTML = items.map(([k,v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+}
+</script>
+
+</body>
+</html>
