@@ -44,7 +44,8 @@ RULES = [(t, re.compile(p, re.I)) for t, p in [
                    r'ENDOTRACHEAL|CONDUCTION|EPIDURAL|SPINAL NEEDLE|CARBON-DIOXIDE'),
     ('Respiratory', r'OXYGEN|NEBULIZER|HUMIDIFIER|FLOWMETER|REGULATOR|VENTILATOR|RESUSCITAT|TRACHEOBRONCH|SPIROMET|'
                     r'TRACHEOSTOMY|RESPIRATORY'),
-    ('Urology & Ostomy', r'UROLOG|\bURINE|URINARY|CATHETER, RETENTION|CATHETER, STRAIGHT|FOLEY|OSTOMY|DRAINAGE BAG|'
+    ('Urology & Ostomy', r'\bUROLOG|\bURINE|URINARY|CATHETER, RETENTION|CATHETER, STRAIGHT|FOLEY|\bOSTOMY|COLOSTOMY|'
+                         r'ILEOSTOMY|UROSTOMY|DRAINAGE BAG|'
                          r'EXTERNAL CATHETER|CATHETER, ?EXTERNAL|UROSHEATH'),
     ('Vascular Access', r'INTRAVASCULAR, ?THERAPEUTIC|ADMINISTRATION, ?INTRAVASCULAR|SET, ADMINISTRATION|SYRINGE, PISTON|'
                         r'NEEDLE, HYPODERMIC|HUBER|FLUSH|IV START|EXTENSION SET|INFUSION|PICC'),
@@ -67,12 +68,13 @@ RULES = [(t, re.compile(p, re.I)) for t, p in [
 ]]
 # Kits go to the category of the procedure they serve; most are surgical procedure packs
 KIT_RULES = [(t, re.compile(p, re.I)) for t, p in [
-    ('Urology & Ostomy', r'FOLEY|URETHRAL|URINARY|CATHETER INSERTION|CATH INSERTION'),
+    ('Urology & Ostomy', r'FOLEY|URETHRAL|URINARY|CATHETER INSERTION|CATH INSERTION|CATHETER CARE|URINE METER|URNMTR|'
+                         r'\bUROLOG'),
     ('Vascular Access', r'IV START|\bCVC\b|\bPICC\b|CENTRAL LINE|DRESSING CHANGE|PORT ACCESS|\bIV KIT|INFUSION'),
     ('Wound Care', r'WOUND|SUTURE REMOVAL|STAPLE REMOVAL|LACERATION|IRRIGATION'),
     ('Lab Supplies', r'SPECIMEN|BLOOD COLLECTION|CULTURE'),
     ('Respiratory', r'\bTRACH|RESPIRATORY|SUCTION KIT|\bABG\b'),
-    ('Anesthesia', r'ANESTHESIA|EPIDURAL|SPINAL|NERVE BLOCK|PAIN TRAY|\bMAC KIT'),
+    ('Anesthesia', r'ANESTHESIA|EPIDURAL|SPINAL (ANES|TRAY|KIT|NEEDLE)|NERVE BLOCK|PAIN TRAY|\bMAC KIT'),
     ('Nursing Supplies/Patient Care', r'ADMISSION|ISOLATION|\bBATH|MATERNITY|POST ?PARTUM|\bPERI\b|ENEMA|SHAVE|ORAL CARE'),
     ('Environmental Services (EVS)', r'TURNOVER|CLEAN ?UP|SPILL'),
 ]]
@@ -154,7 +156,7 @@ def build(g, c, coo, as_of, window_days=90, deep=None, archive=None, drugs=None)
             return item_cat[item] + ('m',)
         text = f'{pcn} | {gmdn} | {desc}'
         if kit:
-            top = next((t for t, rx in KIT_RULES if rx.search(desc) and t in top_names), 'OR/Surgery')
+            top = next((t for t, rx in KIT_RULES if rx.search(f'{pcn} | {desc}') and t in top_names), 'OR/Surgery')
             return top, 'Kits, trays & packs: ' + (type_label(pcn) or 'other'), '', '', 'r'
         for t, rx in RULES:
             if t in top_names and rx.search(text):
