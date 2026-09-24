@@ -316,7 +316,7 @@ function renderPortfolioList(){
   $("#plist").innerHTML = list.map(p => {
     const nw = catSkus(p.name,"new").length, gn = catSkus(p.name,"gone").length;
     return `<button role="option" aria-selected="${state.port===p.id}" data-id="${p.id}">
-      <span class="pn">${esc(p.name)}</span><span class="pc">${p.fams.length.toLocaleString()} families</span>
+      <span class="pn">${esc(p.name)}</span><span class="pc">${p.fams.length.toLocaleString()} products</span>
       <span class="pm"><span class="nw">+${nw} new (90d)</span><span class="gn">−${gn} exits</span></span></button>`;
   }).join("");
   document.querySelectorAll("#plist button").forEach(b => b.addEventListener("click", () => { state.port = b.dataset.id; renderPortfolioList(); renderPortfolioDetail(); }));
@@ -332,7 +332,7 @@ function renderPortfolioDetail(){
   $("#pdetail").innerHTML = `
     <div><div class="eyebrow">Medline category</div><h2>${esc(p.name)}</h2></div>
     <div class="stats">
-      <div class="stat"><div class="v">${p.fams.length.toLocaleString()}</div><div class="k">Medline-brand product families</div></div>
+      <div class="stat"><div class="v">${p.fams.length.toLocaleString()}</div><div class="k">Medline-brand products</div></div>
       <div class="stat"><div class="v">${p.subs.length}</div><div class="k">Subcategories</div></div>
       <div class="stat"><div class="v" style="color:var(--new)">+${nw.length}</div><div class="k">New SKUs, last 90 days</div></div>
       <div class="stat"><div class="v" style="color:var(--gone)">−${gn.length}</div><div class="k">Left distribution, 90 days</div></div>
@@ -340,13 +340,13 @@ function renderPortfolioDetail(){
     <div class="dl">
       <button class="btn" id="dlx">Download Excel</button>
       <button class="btn ghost" id="dlc">Download CSV for Google Sheets</button>
-      <span class="dlnote">Excel includes families, new SKUs, exits, manufacturing sites${deep?" and the item-level deep dive":""}.</span>
+      <span class="dlnote">Excel includes products, new SKUs, exits, manufacturing sites${deep?" and the item-level deep dive":""}.</span>
     </div>
-    <div><div class="subhead"><h3>Families by subcategory</h3><span>Medline-brand families</span></div>
+    <div><div class="subhead"><h3>Products by subcategory</h3><span>Medline-brand products</span></div>
       <div class="subbars" style="margin-top:8px">${p.subs.map(s => `<div class="subbar"><span>${esc(s[0])}</span><span class="track"><span class="fill" style="width:${(s[1]/maxSub*100).toFixed(1)}%"></span></span><span class="cnt">${s[1]}</span></div>`).join("")}</div></div>
-    <div><div class="subhead"><h3>Product families</h3><span id="famCount"></span></div>
-      <input class="search" id="fq" type="search" placeholder="Filter families" style="margin:8px 0">
-      <div class="tblwrap" style="max-height:420px;overflow-y:auto"><table><thead><tr><th>Family ID</th><th>Product family</th><th>Subcategory</th></tr></thead><tbody id="famRows"></tbody></table></div></div>`;
+    <div><div class="subhead"><h3>Products</h3><span id="famCount"></span></div>
+      <input class="search" id="fq" type="search" placeholder="Filter products" style="margin:8px 0">
+      <div class="tblwrap" style="max-height:420px;overflow-y:auto"><table><thead><tr><th>Product ID</th><th>Product</th><th>Subcategory</th></tr></thead><tbody id="famRows"></tbody></table></div></div>`;
   const drawFams = () => {
     const q = ($("#fq").value||"").toLowerCase();
     const f = p.fams.filter(x => !q || (x[1]+" "+x[2]+" "+x[0]).toLowerCase().includes(q));
@@ -359,15 +359,15 @@ function renderPortfolioDetail(){
 }
 
 function skuSheet(rows, mode){
-  return [["Item #","Description","Brand",mode==="new"?"GUDID Publish Date":"Left Distribution Date","Medline Category","Subcategory","Product Family ID","Product Family","Category Source","FDA Product Code","FDA Device Type","GMDN Term","Units per Pack","Country of Origin (FDA-listed sites)","Manufacturing Sites (FDA-listed)","Device ID (GTIN)"]]
+  return [["Item #","Description","Brand",mode==="new"?"GUDID Publish Date":"Left Distribution Date","Medline Category","Subcategory","Product ID","Product","Category Source","FDA Product Code","FDA Device Type","GMDN Term","Units per Pack","Country of Origin (FDA-listed sites)","Manufacturing Sites (FDA-listed)","Device ID (GTIN)"]]
     .concat(rows.map(r => [r.item,r.desc,r.brand,mode==="new"?r.pub:r.end,r.top,r.sub,r.fid,r.fname,r.catSrc,r.pc,r.pcn,r.gmdn,r.units,r.coo.map(c=>CC[c]||c).join(", "),r.sites.join("; "),r.di]));
 }
 function buildRows(p){
   const nw = catSkus(p.name,"new"), gn = catSkus(p.name,"gone");
-  const fams = [["Family ID","Product Family","Subcategory","medline.com URL"]].concat(p.fams.map(f => [f[0],f[1],f[2],"https://www.medline.com/jump/product/x/"+f[0]]));
+  const fams = [["Product ID","Product","Subcategory","medline.com URL"]].concat(p.fams.map(f => [f[0],f[1],f[2],"https://www.medline.com/jump/product/x/"+f[0]]));
   const sites = {}; nw.concat(gn).forEach(r => r.sites.forEach(s => (sites[r.pc+"|"+s] = [r.pc, r.pcn, s])));
   const siteRows = [["FDA Product Code","FDA Device Type","Manufacturing Site (country)"]].concat(Object.values(sites));
-  const summary = [["Medline Industries - Private Label Portfolio — "+p.name],["Data as of",DATA.asOf],["Medline-brand product families",p.fams.length],["Subcategories",p.subs.length],["New SKUs (last 90 days)",nw.length],["SKUs that left distribution (last 90 days)",gn.length],[],["Subcategory","Families"]].concat(p.subs.map(s=>[s[0],s[1]])).concat([[],["Sources"]]).concat(Object.entries(DATA.sources).map(([k,v])=>[k,v]));
+  const summary = [["Medline Industries - Private Label Portfolio — "+p.name],["Data as of",DATA.asOf],["Medline-brand products",p.fams.length],["Subcategories",p.subs.length],["New SKUs (last 90 days)",nw.length],["SKUs that left distribution (last 90 days)",gn.length],[],["Subcategory","Products"]].concat(p.subs.map(s=>[s[0],s[1]])).concat([[],["Sources"]]).concat(Object.entries(DATA.sources).map(([k,v])=>[k,v]));
   return {summary, fams, nw: skuSheet(nw,"new"), gn: skuSheet(gn,"gone"), siteRows, deep: DATA.deep[p.name]};
 }
 async function download(p, fmt){
@@ -383,7 +383,7 @@ async function download(p, fmt){
       const wb = XLSX.utils.book_new();
       const add = (rows, name, widths) => { const ws = XLSX.utils.aoa_to_sheet(rows); if (widths) ws["!cols"] = widths.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb, ws, name); };
       add(R.summary, "Summary", [44,60]);
-      add(R.fams, "Product Families", [16,60,34,50]);
+      add(R.fams, "Products", [16,60,34,50]);
       add(R.nw, "New SKUs (90d)", [16,50,14,14,24,28,16,40,22,10,34,34,8,30,70,18]);
       add(R.gn, "Left Distribution (90d)", [16,50,14,14,24,28,16,40,22,10,34,34,8,30,70,18]);
       add(R.siteRows, "Manufacturing Sites", [12,40,70]);
@@ -394,7 +394,7 @@ async function download(p, fmt){
       const rows = [["Record Type"].concat(R.nw[0])];
       R.nw.slice(1).forEach(r => rows.push(["New SKU"].concat(r)));
       R.gn.slice(1).forEach(r => rows.push(["Left distribution"].concat(r)));
-      R.fams.slice(1).forEach(f => rows.push(["Product family", "", f[1], "MEDLINE", "", p.name, f[2], f[0], f[1]]));
+      R.fams.slice(1).forEach(f => rows.push(["Product", "", f[1], "MEDLINE", "", p.name, f[2], f[0], f[1]]));
       const csv = rows.map(r => r.map(v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; }).join(",")).join("\n");
       await dl.save({filename: base + ".csv", data: csv});
     }
@@ -410,9 +410,9 @@ function renderMethod(){
   const items = [
     ["New SKU", "A Medline Industries item number whose device record was first published to FDA's Global Unique Device Identification Database (GUDID) inside the window. Medline must publish a record before a regulated item ships, so this is the earliest public launch signal. Counted once per item #."],
     ["Left distribution", "An item # whose GUDID record Medline changed to “Not in commercial distribution”. This is the public discontinuation signal."],
-    ["Medline category", "Each item # is looked up in medline.com's catalog search to find its Medline product family and category. Items not yet on medline.com get the category most common for their FDA product code (shown as “inferred”); items with no match at all are grouped under “Not yet on medline.com” by device type."],
+    ["Medline category", "Each item # is looked up in medline.com's catalog search to find its Medline product and category. Items not yet on medline.com get the category most common for their FDA product code (shown as “inferred”); items with no match at all are grouped under “Not yet on medline.com” by device type."],
     ["Country of origin", "Medline does not publish origin by item. We show countries where FDA-registered Medline plants or contract manufacturers are listed for that FDA product code. Treat it as the likely origin, not a label claim."],
-    ["Portfolio", "Every Medline-brand product family on medline.com, by Medline's 26 top-level categories and their subcategories. Families are Medline's product pages; one family usually holds several item #s."],
+    ["Portfolio", "Every Medline-brand product on medline.com, by Medline's 26 top-level categories and their subcategories. A product is one medline.com product page; one product usually holds several item #s."],
     ["Deep dives", "Lab Supplies and Beds & Mattresses downloads include item-level work: specimen collection items with Medline at Home retail prices, and the electric bed SKU master with recalls."],
     ["Refresh", "Rebuilt on the 1st of each month from the latest FDA release files and a new medline.com crawl."],
     ["Sources", Object.values(DATA.sources).join(" ")],

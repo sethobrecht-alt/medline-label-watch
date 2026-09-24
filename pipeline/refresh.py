@@ -1,7 +1,7 @@
 """Monthly refresh for Medline Industries - Private Label Portfolio (runs in GitHub Actions).
 
 1. FDA AccessGUDID release files -> Medline item numbers newly published / no longer in distribution
-2. medline.com catalog search API -> Medline categories, subcategories, product families; item -> category
+2. medline.com catalog search API -> Medline categories, subcategories, products; item -> category
 3. openFDA registration & listing -> manufacturing sites (country of origin) per FDA product code
 4. Build data.json, encrypt with the passcode -> data.enc.json (the site) and state/state.enc.json (for next run)
 
@@ -211,7 +211,7 @@ def pull_catalog(prev, items):
         except Exception as e:
             item_cat[it] = {'err': type(e).__name__}
         time.sleep(0.3)
-    log(f'Catalog: {len(tops)} categories, {sum(len(v) for v in fams.values())} Medline families, {len(todo)} new item lookups')
+    log(f'Catalog: {len(tops)} categories, {sum(len(v) for v in fams.values())} Medline products, {len(todo)} new item lookups')
     return {'tops': tops, 'subs': subs, 'fams': fams, 'itemCat': item_cat}
 
 

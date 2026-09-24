@@ -1,6 +1,6 @@
 """Turn the three raw pulls into the site's data object.
 gudid   {asOf, cols, rows}: Medline GUDID records (new publishes in window + not-in-distribution)
-catalog {tops, subs, fams, itemCat}: medline.com Medline-brand families and item -> category lookups
+catalog {tops, subs, fams, itemCat}: medline.com Medline-brand products and item -> category lookups
 coo     {productCode: ["CC|Site name|CM"]}: FDA-listed manufacturing sites
 """
 import collections, datetime

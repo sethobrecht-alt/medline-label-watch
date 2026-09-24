@@ -15,7 +15,7 @@ The site's data (`data.enc.json`) and the pipeline's working data (`state/state.
 ## Monthly refresh
 `.github/workflows/refresh.yml` runs on the 1st of each month. You can also run it by hand from **Actions → Monthly data refresh → Run workflow**. It pulls three sources:
 1. **FDA AccessGUDID release files:** Medline Industries device records. A new publish counts as a new SKU; "Not in commercial distribution" counts as an exit.
-2. **medline.com catalog search:** Medline-brand families by Medline category, and a category for each new item number.
+2. **medline.com catalog search:** Medline-brand products by Medline category, and a category for each new item number.
 3. **openFDA establishment registration:** the manufacturing sites and countries listed for each FDA product code.
 
 If a source can't be reached, the run keeps that source's data from the previous month and says so in the run summary.
