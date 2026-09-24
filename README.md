@@ -1,4 +1,4 @@
-# Medline Label Watch
+# Medline Industries - Private Label Portfolio
 
 A private tracker of Medline's private-label SKUs:
 - new item numbers over the last 30, 60 and 90 days

@@ -1,4 +1,4 @@
-"""Monthly refresh for Medline Label Watch (runs in GitHub Actions).
+"""Monthly refresh for Medline Industries - Private Label Portfolio (runs in GitHub Actions).
 
 1. FDA AccessGUDID release files -> Medline item numbers newly published / no longer in distribution
 2. medline.com catalog search API -> Medline categories, subcategories, product families; item -> category
@@ -277,7 +277,7 @@ def main():
     json.dump(encrypt_obj({'gudid': recs, 'catalog': catalog, 'coo': coo, 'deep': state.get('deep'), 'asOf': AS_OF}, PASS), open(STATE, 'w'))
     summ = os.environ.get('GITHUB_STEP_SUMMARY')
     if summ:
-        open(summ, 'a').write('## Label Watch refresh ' + AS_OF + '\n\n' + '\n'.join('- ' + l for l in LOG) + '\n')
+        open(summ, 'a').write('## Private Label Portfolio refresh ' + AS_OF + '\n\n' + '\n'.join('- ' + l for l in LOG) + '\n')
 
 
 if __name__ == '__main__':

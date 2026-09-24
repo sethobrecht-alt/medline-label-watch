@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231C6E8C'/%3E%3Cpath d='M8 22V10h4v9h6v3z' fill='white'/%3E%3C/svg%3E">
-<title>Medline Label Watch</title>
+<title>Medline Industries - Private Label Portfolio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -149,8 +149,8 @@ td.date{font-family:var(--mono);white-space:nowrap;font-variant-numeric:tabular-
 <div class="wrap">
   <div id="gate">
     <form class="gate-card" id="gateForm" autocomplete="off">
-      <div class="eyebrow">Medline private label</div>
-      <h1>Label Watch</h1>
+      <div class="eyebrow">Medline Industries</div>
+      <h1>Private Label Portfolio</h1>
       <label for="pass" class="muted">Enter the team passcode to continue.</label>
       <input id="pass" type="password" placeholder="Passcode" autocomplete="current-password">
       <button class="btn" type="submit">Open tracker</button>
@@ -161,8 +161,8 @@ td.date{font-family:var(--mono);white-space:nowrap;font-variant-numeric:tabular-
   <div id="app" hidden>
     <header class="top">
       <div class="brand">
-        <div class="eyebrow">Medline Industries · private-label portfolio</div>
-        <h1>Label <span>Watch</span></h1>
+        <div class="eyebrow">Medline Industries</div>
+        <h1>Private Label <span>Portfolio</span></h1>
         <p>New Medline-brand item numbers, where Medline files them, and where they're made.</p>
       </div>
       <div class="asof">Data as of <b id="asof">…</b><br>Refreshes on the 1st of each month</div>
@@ -367,7 +367,7 @@ function buildRows(p){
   const fams = [["Family ID","Product Family","Subcategory","medline.com URL"]].concat(p.fams.map(f => [f[0],f[1],f[2],"https://www.medline.com/jump/product/x/"+f[0]]));
   const sites = {}; nw.concat(gn).forEach(r => r.sites.forEach(s => (sites[r.pc+"|"+s] = [r.pc, r.pcn, s])));
   const siteRows = [["FDA Product Code","FDA Device Type","Manufacturing Site (country)"]].concat(Object.values(sites));
-  const summary = [["Medline Label Watch — "+p.name],["Data as of",DATA.asOf],["Medline-brand product families",p.fams.length],["Subcategories",p.subs.length],["New SKUs (last 90 days)",nw.length],["SKUs that left distribution (last 90 days)",gn.length],[],["Subcategory","Families"]].concat(p.subs.map(s=>[s[0],s[1]])).concat([[],["Sources"]]).concat(Object.entries(DATA.sources).map(([k,v])=>[k,v]));
+  const summary = [["Medline Industries - Private Label Portfolio — "+p.name],["Data as of",DATA.asOf],["Medline-brand product families",p.fams.length],["Subcategories",p.subs.length],["New SKUs (last 90 days)",nw.length],["SKUs that left distribution (last 90 days)",gn.length],[],["Subcategory","Families"]].concat(p.subs.map(s=>[s[0],s[1]])).concat([[],["Sources"]]).concat(Object.entries(DATA.sources).map(([k,v])=>[k,v]));
   return {summary, fams, nw: skuSheet(nw,"new"), gn: skuSheet(gn,"gone"), siteRows, deep: DATA.deep[p.name]};
 }
 async function download(p, fmt){
