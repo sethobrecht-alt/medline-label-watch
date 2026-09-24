@@ -173,7 +173,7 @@ tr.irow table{font-size:12px}
         <h1>Private Label <span>Portfolio</span></h1>
         <p>New Medline-brand item numbers, where Medline files them, and where they're made.</p>
       </div>
-      <div class="asof">Data as of <b id="asof">…</b><br>Refreshes on the 1st of each month</div>
+      <div class="asof"><span id="itemTotal"></span>Data as of <b id="asof">…</b><br>Refreshes on the 1st of each month</div>
     </header>
     <nav class="tabs" role="tablist">
       <button role="tab" id="tab-new" aria-selected="true" data-view="new">New SKUs</button>
@@ -238,6 +238,7 @@ try { const p = sessionStorage.getItem("lw-pass"); if (p) tryUnlock(p, true); } 
 async function openApp(){
   $("#gate").hidden = true; $("#app").hidden = false;
   $("#asof").textContent = DATA.asOf;
+  if (DATA.all) $("#itemTotal").innerHTML = `<b>${index().active.toLocaleString()}</b> active Medline item #s tracked<br>`;
   renderNew(); renderPortfolioList(); renderMethod();
 }
 
@@ -317,15 +318,37 @@ function catBody(list){
 $("#q").addEventListener("input", e => { state.q = e.target.value; renderNew(); });
 
 /* ---------- Portfolio ---------- */
+// DATA.all: every known Medline item # (FDA GUDID full release + NDC drugs), one row per item:
+// [item, description, brand, status N/D, published, left dist., FDA product code, units, category, subcategory, product id, category source]
+let IDX = null;
+function index(){
+  if (IDX) return IDX;
+  const byTop = new Map(), byFid = new Map(), fname = {};
+  const push = (m, k, r) => { let a = m.get(k); if (!a) m.set(k, a = []); a.push(r); };
+  DATA.portfolio.forEach(p => p.fams.forEach(f => { fname[f[0]] = f[1]; }));
+  (DATA.all || []).forEach(r => { push(byTop, r[8], r); if (r[10]) push(byFid, r[10], r); });
+  const cats = DATA.portfolio.slice();
+  if (DATA.unmatched && byTop.has(DATA.unmatched)) cats.push({id: "__unmatched", name: DATA.unmatched, subs: [], fams: [], pseudo: true});
+  return IDX = {byTop, byFid, fname, cats, total: (DATA.all || []).length, active: (DATA.all || []).filter(r => r[3] === "N").length};
+}
+const itemsIn = name => index().byTop.get(name) || [];
+const itemsOfProduct = fid => index().byFid.get(fid) || [];
+const cooOf = pc => [...new Set(((DATA.sites || {})[pc] || []).map(s => s[0]))];
+const sitesOf = pc => ((DATA.sites || {})[pc] || []).map(s => `${s[1]} (${s[0]}${s[2] ? ", contract/partner" : ""})`);
+const srcName = c => (DATA.srcNames || {})[c] || c;
+const cooChips = pc => { const cs = cooOf(pc); return cs.length ? `<div class="chips">${cs.map(c => `<span class="chip">${esc(CC[c]||c)}</span>`).join("")}</div>` : '<span class="muted">—</span>'; };
+const statusCell = r => `<td class="${r[3]==="D"?"status-d":""}">${r[3]==="D"?"Left distribution":"Active"}</td>`;
+
 function catSkus(name, mode){ return uniqItems(DATA.skus.filter(r => r.top === name && inWindow(r, 90, mode))); }
 function renderPortfolioList(){
   const q = state.pq.toLowerCase();
-  const list = DATA.portfolio.filter(p => !q || p.name.toLowerCase().includes(q));
+  const list = index().cats.filter(p => !q || p.name.toLowerCase().includes(q));
   $("#plist").innerHTML = list.map(p => {
     const nw = catSkus(p.name,"new").length, gn = catSkus(p.name,"gone").length;
+    const act = itemsIn(p.name).filter(r => r[3] === "N").length;
     return `<button role="option" aria-selected="${state.port===p.id}" data-id="${p.id}">
-      <span class="pn">${esc(p.name)}</span><span class="pc">${p.fams.length.toLocaleString()} products</span>
-      <span class="pm"><span class="nw">+${nw} new (90d)</span><span class="gn">−${gn} exits</span></span></button>`;
+      <span class="pn">${esc(p.name)}</span><span class="pc">${act.toLocaleString()} item #s</span>
+      <span class="pm">${p.pseudo ? "<span>Grouped by FDA device type</span>" : `<span>${p.fams.length.toLocaleString()} products</span><span class="nw">+${nw} new (90d)</span><span class="gn">−${gn} exits</span>`}</span></button>`;
   }).join("");
   document.querySelectorAll("#plist button").forEach(b => b.addEventListener("click", () => { state.port = b.dataset.id; renderPortfolioList(); renderPortfolioDetail(); }));
   if (!state.port && list.length){ state.port = list.find(p=>p.name==="Lab Supplies")?.id || list[0].id; renderPortfolioList(); renderPortfolioDetail(); }
@@ -333,24 +356,36 @@ function renderPortfolioList(){
 $("#pq").addEventListener("input", e => { state.pq = e.target.value; renderPortfolioList(); });
 
 function renderPortfolioDetail(){
-  const p = DATA.portfolio.find(x => x.id === state.port); if (!p) return;
+  const p = index().cats.find(x => x.id === state.port); if (!p) return;
   const nw = catSkus(p.name,"new"), gn = catSkus(p.name,"gone");
+  const its = itemsIn(p.name), act = its.filter(r => r[3] === "N").length;
   const deep = DATA.deep[p.name];
   const maxSub = Math.max(1, ...p.subs.map(s=>s[1]));
+  const subCounts = {}; its.forEach(r => { const s = r[9] || "Unassigned"; subCounts[s] = (subCounts[s] || 0) + 1; });
+  const subOpts = Object.entries(subCounts).sort((a,b) => b[1]-a[1]);
   $("#pdetail").innerHTML = `
-    <div><div class="eyebrow">Medline category</div><h2>${esc(p.name)}</h2></div>
+    <div><div class="eyebrow">${p.pseudo ? "Not on medline.com's category tree" : "Medline category"}</div><h2>${esc(p.name)}</h2></div>
     <div class="stats">
-      <div class="stat"><div class="v">${p.fams.length.toLocaleString()}</div><div class="k">Medline-brand products</div></div>
-      <div class="stat"><div class="v">${p.subs.length}</div><div class="k">Subcategories</div></div>
+      <div class="stat"><div class="v">${act.toLocaleString()}</div><div class="k">Active Medline item #s</div></div>
+      <div class="stat"><div class="v" style="color:var(--gone)">${(its.length - act).toLocaleString()}</div><div class="k">Item #s no longer distributed</div></div>
+      ${p.pseudo ? "" : `<div class="stat"><div class="v">${p.fams.length.toLocaleString()}</div><div class="k">Products on medline.com</div></div>
       <div class="stat"><div class="v" style="color:var(--new)">+${nw.length}</div><div class="k">New SKUs, last 90 days</div></div>
-      <div class="stat"><div class="v" style="color:var(--gone)">−${gn.length}</div><div class="k">Left distribution, 90 days</div></div>
+      <div class="stat"><div class="v" style="color:var(--gone)">−${gn.length}</div><div class="k">Left distribution, 90 days</div></div>`}
     </div>
     <div class="dl">
       <button class="btn" id="dlx">Download Excel</button>
       <button class="btn ghost" id="dlc">Download CSV for Google Sheets</button>
-      <span class="dlnote">Excel includes products, item #s by product, new SKUs, exits, manufacturing sites${deep?" and the item-level deep dive":""}.</span>
+      <span class="dlnote">Excel includes every item #${p.pseudo ? "" : ", products, new SKUs, exits"}, manufacturing sites${deep?" and the item-level deep dive":""}.</span>
     </div>
-    <div><div class="subhead"><h3>Products by subcategory</h3><span>Medline-brand products</span></div>
+    <div><div class="subhead"><h3>All item #s</h3><span id="allCount"></span></div>
+      <div class="fopts">
+        <input class="search" id="aq" type="search" placeholder="Search item #, description, brand">
+        <select class="search" id="ast" style="width:auto"><option value="N">Active</option><option value="">Active + no longer distributed</option><option value="D">No longer distributed</option></select>
+        <select class="search" id="asub" style="width:auto"><option value="">All subcategories</option>${subOpts.map(([s,n]) => `<option value="${esc(s)}">${esc(s)} (${n.toLocaleString()})</option>`).join("")}</select>
+      </div>
+      <div class="tblwrap" style="max-height:560px;overflow-y:auto"><table><thead><tr><th>Item #</th><th>Description</th><th>Brand</th><th>Subcategory</th><th>Product</th><th>Status</th><th>Published</th><th>Category source</th><th>Country of origin*</th></tr></thead><tbody id="allRows"></tbody></table></div>
+      <p class="muted" style="font-size:12px;margin:6px 0 0">Every item # Medline Industries has filed with FDA as a device (GUDID) or OTC drug (NDC), placed in this category by its medline.com listing or, when it has none, by the category Medline uses for the same FDA device type. *Countries where FDA-registered Medline or contract sites make that device type.</p></div>
+    ${p.pseudo ? "" : `<div><div class="subhead"><h3>Products by subcategory</h3><span>Medline-brand products</span></div>
       <div class="subbars" style="margin-top:8px">${p.subs.map(s => `<div class="subbar"><span>${esc(s[0])}</span><span class="track"><span class="fill" style="width:${(s[1]/maxSub*100).toFixed(1)}%"></span></span><span class="cnt">${s[1]}</span></div>`).join("")}</div></div>
     <div><div class="subhead"><h3>Products</h3><span id="famCount"></span></div>
       <div class="fopts">
@@ -358,34 +393,46 @@ function renderPortfolioDetail(){
         <label><input type="checkbox" id="fonly"> Only products with known item #s</label>
       </div>
       <div class="tblwrap" style="max-height:520px;overflow-y:auto"><table><thead><tr><th>Product ID</th><th>Product</th><th>Subcategory</th><th>Item #s</th></tr></thead><tbody id="famRows"></tbody></table></div>
-      <p class="muted" style="font-size:12px;margin:6px 0 0">Item #s come from FDA's GUDID records matched to this product. The list covers items published or changed since tracking began, so it grows each month and won't be complete for older products.</p></div>`;
-  const itemsOf = fid => (DATA.items && DATA.items[fid]) || [];
-  const withItems = p.fams.filter(x => itemsOf(x[0]).length).length;
-  const openProds = new Set();
-  const itemTable = its => `<table><thead><tr><th>Item #</th><th>Description</th><th>Status</th><th>GUDID published</th><th>Left dist.</th><th>Units</th><th>Country of origin*</th></tr></thead><tbody>${its.map(i => `<tr>
-      <td class="item">${esc(i[0])}</td><td>${esc(i[1])}</td>
-      <td class="${i[2]==="D"?"status-d":""}">${i[2]==="D"?"Left distribution":"Active"}</td>
-      <td class="date">${esc(i[3]||"—")}</td><td class="date">${esc(i[4]||"—")}</td><td>${esc(i[5]||"—")}</td>
-      <td>${i[6].length ? `<div class="chips">${i[6].map(c => `<span class="chip">${esc(CC[c]||c)}</span>`).join("")}</div>` : '<span class="muted">—</span>'}</td></tr>`).join("")}</tbody></table>`;
-  const drawFams = () => {
-    const q = ($("#fq").value||"").toLowerCase(), only = $("#fonly").checked;
-    const f = p.fams.filter(x => {
-      const its = itemsOf(x[0]);
-      if (only && !its.length) return false;
-      return !q || (x[1]+" "+x[2]+" "+x[0]).toLowerCase().includes(q) || its.some(i => (i[0]+" "+i[1]).toLowerCase().includes(q));
-    }).sort((a,b) => itemsOf(b[0]).length - itemsOf(a[0]).length);
-    $("#famCount").textContent = `${f.length.toLocaleString()} of ${p.fams.length.toLocaleString()} · ${withItems.toLocaleString()} with item #s`;
-    $("#famRows").innerHTML = f.slice(0,400).map(x => {
-      const its = itemsOf(x[0]), open = openProds.has(x[0]);
-      return `<tr><td class="item"><a href="https://www.medline.com/jump/product/x/${esc(x[0])}" target="_blank" rel="noopener" style="color:inherit">${esc(x[0])}</a></td><td>${esc(x[1])}</td><td class="muted">${esc(x[2]||"—")}</td>
-        <td>${its.length ? `<button class="itoggle" data-fid="${esc(x[0])}" aria-expanded="${open}"><span class="chev">▸</span> ${its.length}</button>` : '<span class="muted">—</span>'}</td></tr>`
-        + (open ? `<tr class="irow"><td colspan="4"><div class="tblwrap">${itemTable(its)}</div></td></tr>` : "");
-    }).join("") + (f.length>400?`<tr><td colspan="4" class="muted">Showing the first 400. The download has all ${f.length.toLocaleString()}.</td></tr>`:"");
-    document.querySelectorAll("#famRows .itoggle").forEach(b => b.addEventListener("click", () => {
-      const id = b.dataset.fid; openProds.has(id) ? openProds.delete(id) : openProds.add(id); drawFams();
-    }));
+      <p class="muted" style="font-size:12px;margin:6px 0 0">Item #s under a product are those matched to that medline.com product page. Most item #s aren't matched to a specific product yet; they're all in "All item #s" above.</p></div>`}`;
+
+  const drawAll = () => {
+    const q = ($("#aq").value||"").toLowerCase(), st = $("#ast").value, sub = $("#asub").value;
+    const f = its.filter(r => (!st || r[3] === st) && (!sub || (r[9] || "Unassigned") === sub) && (!q || (r[0]+" "+r[1]+" "+r[2]).toLowerCase().includes(q)));
+    $("#allCount").textContent = `${f.length.toLocaleString()} of ${its.length.toLocaleString()}`;
+    $("#allRows").innerHTML = f.slice(0,400).map(r => `<tr><td class="item">${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2]||"—")}</td><td class="muted">${esc(r[9]||"—")}</td>
+      <td>${r[10] ? esc(index().fname[r[10]] || r[10]) : '<span class="muted">—</span>'}</td>${statusCell(r)}<td class="date">${esc(r[4]||"—")}</td>
+      <td><span class="pill inf"${r[11]==="m"?' style="background:var(--new-soft);color:var(--new)"':""}>${esc(srcName(r[11]))}</span></td><td>${cooChips(r[6])}</td></tr>`).join("")
+      + (f.length>400?`<tr><td colspan="9" class="muted">Showing the first 400. Search to narrow it down; the download has all ${f.length.toLocaleString()}.</td></tr>`:"")
+      + (!its.length?`<tr><td colspan="9" class="muted">No item #s in this category yet.</td></tr>`:"");
   };
-  drawFams(); $("#fq").addEventListener("input", drawFams); $("#fonly").addEventListener("change", drawFams);
+  drawAll(); ["aq","ast","asub"].forEach(id => $("#"+id).addEventListener(id==="aq"?"input":"change", drawAll));
+
+  if (!p.pseudo){
+    const withItems = p.fams.filter(x => itemsOfProduct(x[0]).length).length;
+    const openProds = new Set();
+    const itemTable = rows => `<table><thead><tr><th>Item #</th><th>Description</th><th>Status</th><th>Published</th><th>Left dist.</th><th>Units</th><th>Country of origin*</th></tr></thead><tbody>${rows.map(r => `<tr>
+        <td class="item">${esc(r[0])}</td><td>${esc(r[1])}</td>${statusCell(r)}
+        <td class="date">${esc(r[4]||"—")}</td><td class="date">${esc(r[5]||"—")}</td><td>${esc(r[7]||"—")}</td><td>${cooChips(r[6])}</td></tr>`).join("")}</tbody></table>`;
+    const drawFams = () => {
+      const q = ($("#fq").value||"").toLowerCase(), only = $("#fonly").checked;
+      const f = p.fams.filter(x => {
+        const rs = itemsOfProduct(x[0]);
+        if (only && !rs.length) return false;
+        return !q || (x[1]+" "+x[2]+" "+x[0]).toLowerCase().includes(q) || rs.some(r => (r[0]+" "+r[1]).toLowerCase().includes(q));
+      }).sort((a,b) => itemsOfProduct(b[0]).length - itemsOfProduct(a[0]).length);
+      $("#famCount").textContent = `${f.length.toLocaleString()} of ${p.fams.length.toLocaleString()} · ${withItems.toLocaleString()} with item #s`;
+      $("#famRows").innerHTML = f.slice(0,400).map(x => {
+        const rs = itemsOfProduct(x[0]), open = openProds.has(x[0]);
+        return `<tr><td class="item"><a href="https://www.medline.com/jump/product/x/${esc(x[0])}" target="_blank" rel="noopener" style="color:inherit">${esc(x[0])}</a></td><td>${esc(x[1])}</td><td class="muted">${esc(x[2]||"—")}</td>
+          <td>${rs.length ? `<button class="itoggle" data-fid="${esc(x[0])}" aria-expanded="${open}"><span class="chev">▸</span> ${rs.length}</button>` : '<span class="muted">—</span>'}</td></tr>`
+          + (open ? `<tr class="irow"><td colspan="4"><div class="tblwrap">${itemTable(rs)}</div></td></tr>` : "");
+      }).join("") + (f.length>400?`<tr><td colspan="4" class="muted">Showing the first 400. The download has all ${f.length.toLocaleString()}.</td></tr>`:"");
+      document.querySelectorAll("#famRows .itoggle").forEach(b => b.addEventListener("click", () => {
+        const id = b.dataset.fid; openProds.has(id) ? openProds.delete(id) : openProds.add(id); drawFams();
+      }));
+    };
+    drawFams(); $("#fq").addEventListener("input", drawFams); $("#fonly").addEventListener("change", drawFams);
+  }
   $("#dlx").addEventListener("click", () => download(p, "xlsx"));
   $("#dlc").addEventListener("click", () => download(p, "csv"));
 }
@@ -395,13 +442,14 @@ function skuSheet(rows, mode){
     .concat(rows.map(r => [r.item,r.desc,r.brand,mode==="new"?r.pub:r.end,r.top,r.sub,r.fid,r.fname,r.catSrc,r.pc,r.pcn,r.gmdn,r.units,r.coo.map(c=>CC[c]||c).join(", "),r.sites.join("; "),r.di]));
 }
 function buildRows(p){
-  const nw = catSkus(p.name,"new"), gn = catSkus(p.name,"gone");
-  const fams = [["Product ID","Product","Subcategory","medline.com URL"]].concat(p.fams.map(f => [f[0],f[1],f[2],"https://www.medline.com/jump/product/x/"+f[0]]));
-  const sites = {}; nw.concat(gn).forEach(r => r.sites.forEach(s => (sites[r.pc+"|"+s] = [r.pc, r.pcn, s])));
+  const nw = catSkus(p.name,"new"), gn = catSkus(p.name,"gone"), its = itemsIn(p.name), act = its.filter(r => r[3] === "N").length;
+  const fams = [["Product ID","Product","Subcategory","Known Item #s","medline.com URL"]].concat(p.fams.map(f => [f[0],f[1],f[2],itemsOfProduct(f[0]).length,"https://www.medline.com/jump/product/x/"+f[0]]));
+  const itemRows = [["Item #","Description","Brand","Status","Published (GUDID / NDC start)","Left Distribution Date","Medline Category","Subcategory","Product ID","Product","Category Source","FDA Product Code","FDA Device Type","Units per Pack","Country of Origin (FDA-listed sites)","Manufacturing Sites (FDA-listed)"]]
+    .concat(its.map(r => [r[0],r[1],r[2],r[3]==="D"?"No longer distributed":"Active",r[4],r[5],r[8],r[9],r[10],r[10]?(index().fname[r[10]]||""):"",srcName(r[11]),r[6],(DATA.pcn||{})[r[6]]||"",r[7],cooOf(r[6]).map(c=>CC[c]||c).join(", "),sitesOf(r[6]).join("; ")]));
+  const sites = {}; its.forEach(r => r[6] && sitesOf(r[6]).forEach(s => (sites[r[6]+"|"+s] = [r[6], (DATA.pcn||{})[r[6]]||"", s])));
+  nw.concat(gn).forEach(r => r.sites.forEach(s => (sites[r.pc+"|"+s] = [r.pc, r.pcn, s])));
   const siteRows = [["FDA Product Code","FDA Device Type","Manufacturing Site (country)"]].concat(Object.values(sites));
-  const summary = [["Medline Industries - Private Label Portfolio — "+p.name],["Data as of",DATA.asOf],["Medline-brand products",p.fams.length],["Subcategories",p.subs.length],["New SKUs (last 90 days)",nw.length],["SKUs that left distribution (last 90 days)",gn.length],[],["Subcategory","Products"]].concat(p.subs.map(s=>[s[0],s[1]])).concat([[],["Sources"]]).concat(Object.entries(DATA.sources).map(([k,v])=>[k,v]));
-  const itemRows = [["Product ID","Product","Subcategory","Item #","Description","Status","GUDID Publish Date","Left Distribution Date","Units per Pack","Country of Origin (FDA-listed sites)"]]
-    .concat(p.fams.flatMap(f => ((DATA.items && DATA.items[f[0]]) || []).map(i => [f[0],f[1],f[2],i[0],i[1],i[2]==="D"?"Left distribution":"Active",i[3],i[4],i[5],i[6].map(c=>CC[c]||c).join(", ")])));
+  const summary = [["Medline Industries - Private Label Portfolio — "+p.name],["Data as of",DATA.asOf],["Active Medline item #s",act],["Item #s no longer distributed",its.length-act],["Medline-brand products on medline.com",p.fams.length],["Subcategories",p.subs.length],["New SKUs (last 90 days)",nw.length],["SKUs that left distribution (last 90 days)",gn.length],[],["Subcategory","Products"]].concat(p.subs.map(s=>[s[0],s[1]])).concat([[],["Sources"]]).concat(Object.entries(DATA.sources).map(([k,v])=>[k,v]));
   return {summary, fams, itemRows, nw: skuSheet(nw,"new"), gn: skuSheet(gn,"gone"), siteRows, deep: DATA.deep[p.name]};
 }
 async function download(p, fmt){
@@ -417,8 +465,8 @@ async function download(p, fmt){
       const wb = XLSX.utils.book_new();
       const add = (rows, name, widths) => { const ws = XLSX.utils.aoa_to_sheet(rows); if (widths) ws["!cols"] = widths.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb, ws, name); };
       add(R.summary, "Summary", [44,60]);
-      add(R.fams, "Products", [16,60,34,50]);
-      add(R.itemRows, "Item Numbers", [16,50,28,16,60,16,14,14,8,30]);
+      add(R.itemRows, "All Item Numbers", [16,60,18,20,14,14,24,28,16,40,24,10,34,12,30,70]);
+      if (!p.pseudo) add(R.fams, "Products", [16,60,34,12,50]);
       add(R.nw, "New SKUs (90d)", [16,50,14,14,24,28,16,40,22,10,34,34,8,30,70,18]);
       add(R.gn, "Left Distribution (90d)", [16,50,14,14,24,28,16,40,22,10,34,34,8,30,70,18]);
       add(R.siteRows, "Manufacturing Sites", [12,40,70]);
@@ -429,8 +477,8 @@ async function download(p, fmt){
       const rows = [["Record Type"].concat(R.nw[0])];
       R.nw.slice(1).forEach(r => rows.push(["New SKU"].concat(r)));
       R.gn.slice(1).forEach(r => rows.push(["Left distribution"].concat(r)));
+      R.itemRows.slice(1).forEach(i => rows.push(["Item # (" + i[3] + ")", i[0], i[1], i[2], i[4], i[6], i[7], i[8], i[9], i[10], i[11], i[12], "", i[13], i[14], i[15], ""]));
       R.fams.slice(1).forEach(f => rows.push(["Product", "", f[1], "MEDLINE", "", p.name, f[2], f[0], f[1]]));
-      R.itemRows.slice(1).forEach(i => rows.push(["Item # under product (" + i[5] + ")", i[3], i[4], "MEDLINE", i[6], p.name, i[2], i[0], i[1], "", "", "", "", i[8], i[9]]));
       const csv = rows.map(r => r.map(v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; }).join(",")).join("\n");
       await dl.save({filename: base + ".csv", data: csv});
     }
@@ -449,7 +497,9 @@ function renderMethod(){
     ["Medline category", "Each item # is looked up in medline.com's catalog search to find its Medline product and category. Items not yet on medline.com get the category most common for their FDA product code (shown as “inferred”); items with no match at all are grouped under “Not yet on medline.com” by device type."],
     ["Country of origin", "Medline does not publish origin by item. We show countries where FDA-registered Medline plants or contract manufacturers are listed for that FDA product code. Treat it as the likely origin, not a label claim."],
     ["Portfolio", "Every Medline-brand product on medline.com, by Medline's 26 top-level categories and their subcategories. A product is one medline.com product page; one product usually holds several item #s."],
-    ["Item #s by product", "Open a product in the Portfolio Checker to see the item #s we know under it. They come from FDA GUDID records matched to that medline.com product. Tracking of all item #s started in September 2026 and keeps every item seen since, so older products fill in over time and some show none yet."],
+    ["All item #s", "Every item # Medline Industries has on file with FDA: each device record in the GUDID full release labeled by Medline Industries, plus OTC drug products in FDA's NDC directory with Medline as the labeler. Monthly GUDID updates keep it current. Items Medline doesn't have to file with FDA (some cleaning chemicals, food, office supplies) aren't included."],
+    ["Item categories", "An item # found on medline.com takes its category from there. Otherwise it takes the category Medline most often uses for the same FDA product code, or failing that the same device type (shown as “inferred”). Items with no clue at all are listed under “Not matched to a medline.com category” by FDA device type."],
+    ["Item #s by product", "Opening a product shows the item #s matched to that medline.com product page. Only item #s looked up on medline.com (new SKUs) are matched to a product, so most products show none; every item # is still listed under its category."],
     ["Deep dives", "Lab Supplies and Beds & Mattresses downloads include item-level work: specimen collection items with Medline at Home retail prices, and the electric bed SKU master with recalls."],
     ["Refresh", "Rebuilt on the 1st of each month from the latest FDA release files and a new medline.com crawl."],
     ["Sources", Object.values(DATA.sources).join(" ")],

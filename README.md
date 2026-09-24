@@ -1,6 +1,7 @@
 # Medline Industries - Private Label Portfolio
 
 A private tracker of Medline's private-label SKUs:
+- every item number Medline Industries has on file with FDA, by Medline category
 - new item numbers over the last 30, 60 and 90 days
 - items that left distribution
 - Medline categories and subcategories
@@ -13,10 +14,11 @@ A private tracker of Medline's private-label SKUs:
 The site's data (`data.enc.json`) and the pipeline's working data (`state/state.enc.json`) are encrypted with AES-256-GCM. The key comes from the passcode through PBKDF2-SHA256 (250,000 rounds). The repo and the site hold only ciphertext, and the browser decrypts it locally once the passcode is entered. The Actions logs print counts only.
 
 ## Monthly refresh
-`.github/workflows/refresh.yml` runs on the 1st of each month. You can also run it by hand from **Actions → Monthly data refresh → Run workflow**. It pulls three sources:
-1. **FDA AccessGUDID release files:** Medline Industries device records. A new publish counts as a new SKU; "Not in commercial distribution" counts as an exit.
+`.github/workflows/refresh.yml` runs on the 1st of each month. You can also run it by hand from **Actions → Monthly data refresh → Run workflow**. It pulls four sources:
+1. **FDA AccessGUDID release files:** Medline Industries device records. A new publish counts as a new SKU; "Not in commercial distribution" counts as an exit. The first run also reads the GUDID full release (about 520 MB) to load every Medline item number; after that the monthly updates keep it current. To re-read the full release, run the workflow by hand with **full_backfill** ticked.
 2. **medline.com catalog search:** Medline-brand products by Medline category, and a category for each new item number.
 3. **openFDA establishment registration:** the manufacturing sites and countries listed for each FDA product code.
+4. **openFDA NDC directory:** OTC drug products with Medline as the labeler.
 
 If a source can't be reached, the run keeps that source's data from the previous month and says so in the run summary.
 

@@ -8,6 +8,10 @@ on:
       as_of:
         description: "As-of date (YYYY-MM-DD). Leave blank for today."
         required: false
+      full_backfill:
+        description: "Re-read the FDA GUDID full release (every Medline item). Runs automatically the first time."
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -19,7 +23,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,6 +34,7 @@ jobs:
         env:
           LABEL_WATCH_PASSCODE: ${{ secrets.LABEL_WATCH_PASSCODE }}
           AS_OF: ${{ github.event.inputs.as_of }}
+          FULL_BACKFILL: ${{ github.event.inputs.full_backfill == 'true' && '1' || '' }}
         run: python pipeline/refresh.py
       - name: Commit updated data
         run: |
