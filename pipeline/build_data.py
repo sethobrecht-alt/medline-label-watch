@@ -12,7 +12,7 @@ SOURCES = {
 }
 
 
-def build(g, c, coo, as_of, window_days=90, deep=None):
+def build(g, c, coo, as_of, window_days=90, deep=None, archive=None):
     cutoff = (datetime.date.fromisoformat(as_of) - datetime.timedelta(days=window_days)).isoformat()
     fam_loc, portfolio = {}, []
     for nm, cid in c['tops']:
@@ -71,4 +71,19 @@ def build(g, c, coo, as_of, window_days=90, deep=None):
                      'fname': fname, 'catSrc': src, 'coo': sorted({x['cc'] for x in cs}),
                      'sites': [f"{x['site']} ({x['cc']}{', contract/partner' if x['cm'] else ''})" for x in cs][:8]})
 
-    return {'asOf': as_of, 'sources': SOURCES, 'skus': rows, 'portfolio': portfolio, 'deep': deep or {}}
+    # Item #s under each medline.com product: every archived GUDID record whose item # was matched to a product.
+    # One row per item #: [item, description, status N/D, publish date, left-distribution date, units, [countries]]
+    by_prod = {}
+    for r in archive or []:
+        item, pub, st, end, brand, desc, gmdn, pc, pcn, cnt, di, sterile, rx = r
+        ic = item_cat.get(item)
+        if not ic or not ic[2]:
+            continue
+        prod = by_prod.setdefault(ic[2], {})
+        prev = prod.get(item)
+        if prev is None or pub > prev[3]:
+            prod[item] = [item, desc.replace('""', '"'), st, pub, end, cnt, sorted({x['cc'] for x in countries(pc)})]
+    items = {fid: sorted(v.values()) for fid, v in by_prod.items()}
+
+    return {'asOf': as_of, 'sources': SOURCES, 'skus': rows, 'portfolio': portfolio, 'deep': deep or {},
+            'items': items}

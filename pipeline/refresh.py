@@ -128,7 +128,7 @@ def pull_gudid(state):
     cutoff = START
     keep = {di: r for di, r in recs.items()
             if (r[2] == 'N' and r[1] >= cutoff) or (r[2] == 'D' and (r[3] or r[-1]) >= cutoff)}
-    return keep
+    return keep, recs
 
 
 # ---------------------------------------------------------------- 2. medline.com catalog
@@ -246,10 +246,17 @@ def pull_coo():
 # ---------------------------------------------------------------- main
 def main():
     state = load_state()
+    seen = {}
     try:
-        recs = pull_gudid(state)
+        recs, seen = pull_gudid(state)
     except Exception as e:
         log(f'GUDID failed ({type(e).__name__}); keeping previous records'); recs = state['gudid']
+    # Every Medline record ever seen, never pruned: feeds the item #s listed under each product
+    archive = dict(state.get('archive') or {})
+    for di, r in list(recs.items()) + list(seen.items()):
+        if di not in archive or r[-1] >= archive[di][-1]:
+            archive[di] = r
+    log(f'Item archive: {len(archive)} Medline device records')
     rows = [r[:-1] for r in recs.values()]
     items = sorted({r[0] for r in rows})
 
@@ -266,7 +273,8 @@ def main():
         except Exception as e:
             log(f'Origin failed ({type(e).__name__}); keeping previous sites')
 
-    data = build({'rows': rows}, catalog, coo or {}, AS_OF, WINDOW, state.get('deep'))
+    data = build({'rows': rows}, catalog, coo or {}, AS_OF, WINDOW, state.get('deep'),
+                 archive=[r[:-1] for r in archive.values()])
     asof = datetime.date.fromisoformat(AS_OF)
     def n_new(days):
         cut = (asof - datetime.timedelta(days=days)).isoformat()
@@ -274,7 +282,8 @@ def main():
     log(f"New SKUs 30/60/90 days: {n_new(30)} / {n_new(60)} / {n_new(90)}; exits: {len({r['item'] for r in data['skus'] if r['status'] == 'D'})}")
 
     json.dump(encrypt_obj(data, PASS), open(os.path.join(ROOT, 'data.enc.json'), 'w'))
-    json.dump(encrypt_obj({'gudid': recs, 'catalog': catalog, 'coo': coo, 'deep': state.get('deep'), 'asOf': AS_OF}, PASS), open(STATE, 'w'))
+    json.dump(encrypt_obj({'gudid': recs, 'archive': archive, 'catalog': catalog, 'coo': coo,
+                           'deep': state.get('deep'), 'asOf': AS_OF}, PASS), open(STATE, 'w'))
     summ = os.environ.get('GITHUB_STEP_SUMMARY')
     if summ:
         open(summ, 'a').write('## Private Label Portfolio refresh ' + AS_OF + '\n\n' + '\n'.join('- ' + l for l in LOG) + '\n')
