@@ -98,7 +98,7 @@ def type_label(pcn):
     return pcn[:1].upper() + pcn[1:].lower() if pcn else ''
 
 
-def build(g, c, coo, as_of, window_days=90, deep=None, archive=None, drugs=None):
+def build(g, c, coo, as_of, window_days=90, deep=None, archive=None, drugs=None, attrs=None):
     cutoff = (datetime.date.fromisoformat(as_of) - datetime.timedelta(days=window_days)).isoformat()
     fam_loc, portfolio = {}, []
     for nm, cid in c['tops']:
@@ -210,4 +210,6 @@ def build(g, c, coo, as_of, window_days=90, deep=None, archive=None, drugs=None)
 
     return {'asOf': as_of, 'sources': SOURCES, 'skus': rows, 'portfolio': portfolio, 'deep': deep or {},
             'all': list(allrows.values()), 'pcn': pcn_map, 'sites': {k: v for k, v in sites.items() if v},
-            'srcNames': SRC, 'unmatched': UNMATCHED}
+            'srcNames': SRC, 'unmatched': UNMATCHED,
+            # medline.com filter values per product ({product id: {filter: [values]}}) for the non-FDA categories
+            'attrs': {fid: a for fid, a in (attrs or {}).items() if fid in fam_loc}}

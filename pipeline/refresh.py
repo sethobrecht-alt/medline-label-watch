@@ -10,7 +10,8 @@
 Every source falls back to the previous run's data if it can't be reached, so a blocked source never
 empties the site. Only counts are printed: this repo's Actions logs are public.
 Env: LABEL_WATCH_PASSCODE (required), AS_OF (optional YYYY-MM-DD), FULL_BACKFILL=1 (re-read the GUDID full
-release; it is read automatically on the first run), SKIP_CATALOG=1 / SKIP_COO=1 / SKIP_DRUGS=1 (optional)
+release; it is read automatically on the first run), SKIP_CATALOG=1 / SKIP_ATTRS=1 / SKIP_COO=1 / SKIP_DRUGS=1
+(optional)
 """
 import collections, datetime, io, json, os, re, sys, tempfile, time, zipfile
 import xml.etree.ElementTree as ET
@@ -315,6 +316,46 @@ def pull_catalog(prev, items):
     return {'tops': tops, 'subs': subs, 'fams': fams, 'itemCat': item_cat}
 
 
+# Product attributes from medline.com's own search filters (absorbency, material, size...), for categories whose
+# products mostly aren't FDA-regulated and so have no item #s from GUDID. One search per filter value, 1/second.
+ATTR_CATS = {'Incontinence', 'Skin Care', 'Environmental Services (EVS)', 'Nutrition', 'Office Supplies', 'Textiles',
+             'Pharmacy'}
+ATTR_MAX_SEARCHES = 1500
+
+
+def pull_attrs(catalog):
+    out, n, skipped = {}, 0, 0
+    for nm, cid in catalog['tops']:
+        if nm not in ATTR_CATS:
+            continue
+        first = mq('category', cid, 0, 1, 'Manufacturer:MEDLINE'); n += 1
+        for f in first.get('facets') or []:
+            fname = f.get('facetName') or ''
+            if f.get('isCategoryFacet') or fname in ('Category', 'Manufacturer'):
+                continue
+            for v in f.get('facetValues') or []:
+                val, cnt = v.get('name') or '', int(v.get('count') or 0)
+                if not val or ',' in val or not cnt or n >= ATTR_MAX_SEARCHES:
+                    continue
+                start, total = 0, 1
+                while start < total:
+                    b = mq('category', cid, start, 200, f'Manufacturer:MEDLINE,{fname}:{val}'); n += 1
+                    total = int(b.get('totalNumRecords') or 0)
+                    if total > cnt * 1.5 + 5:   # filter ignored by the API: don't tag every product with it
+                        skipped += 1; break
+                    prods = b.get('products') or []
+                    for p in prods:
+                        if (p.get('manufacturer') or '').upper() == 'MEDLINE':
+                            out.setdefault(p['productId'], {}).setdefault(fname, []).append(val)
+                    start += 200
+                    if not prods:
+                        break
+                    time.sleep(1)
+                time.sleep(1)
+    log(f'Attributes: {len(out)} products tagged in {len(ATTR_CATS)} categories ({n} searches, {skipped} filters skipped)')
+    return out
+
+
 # ---------------------------------------------------------------- 3. openFDA manufacturing sites
 def pull_coo():
     est = []
@@ -400,6 +441,12 @@ def main():
             catalog = pull_catalog(catalog, items)
         except Exception as e:
             log(f'Catalog failed ({type(e).__name__}: {str(e)[:80]}); keeping previous catalog')
+    attrs = state.get('attrs') or {}
+    if catalog and os.environ.get('SKIP_CATALOG') != '1' and os.environ.get('SKIP_ATTRS') != '1':
+        try:
+            attrs = pull_attrs(catalog)
+        except Exception as e:
+            log(f'Attributes failed ({type(e).__name__}: {str(e)[:80]}); keeping previous attributes')
     coo = state.get('coo')
     if os.environ.get('SKIP_COO') != '1':
         try:
@@ -414,7 +461,7 @@ def main():
             log(f'Drugs failed ({type(e).__name__}); keeping previous drug list')
 
     data = build({'rows': rows}, catalog, coo or {}, AS_OF, WINDOW, state.get('deep'),
-                 archive=[r[:-1] for r in archive.values()], drugs=drugs or [])
+                 archive=[r[:-1] for r in archive.values()], drugs=drugs or [], attrs=attrs)
     allrows = data['all']
     by_src = collections.Counter(r[11] for r in allrows)
     kits = sum(r[12] for r in allrows)
@@ -429,7 +476,7 @@ def main():
     log(f"New SKUs 30/60/90 days: {n_new(30)} / {n_new(60)} / {n_new(90)}; exits: {len({r['item'] for r in data['skus'] if r['status'] == 'D'})}")
 
     json.dump(encrypt_obj(data, PASS), open(os.path.join(ROOT, 'data.enc.json'), 'w'))
-    json.dump(encrypt_obj({'gudid': recs, 'archive': archive, 'fullAsOf': full_as_of, 'drugs': drugs,
+    json.dump(encrypt_obj({'gudid': recs, 'archive': archive, 'fullAsOf': full_as_of, 'drugs': drugs, 'attrs': attrs,
                            'catalog': catalog, 'coo': coo, 'deep': state.get('deep'), 'asOf': AS_OF}, PASS),
               open(STATE, 'w'))
     for f in ('data.enc.json', 'state/state.enc.json'):

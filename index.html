@@ -334,6 +334,10 @@ function index(){
   return IDX = {byTop, byFid, fname, cats, total: (DATA.all || []).length, active: act.length, activeKits: act.filter(r => r[12]).length};
 }
 const isKit = r => !!r[12];
+// medline.com filter values for a product (absorbency, material, size...), only for non-FDA categories
+const attrsOf = fid => (DATA.attrs || {})[fid];
+const attrText = fid => { const a = attrsOf(fid); return a ? Object.entries(a).map(([k,v]) => `${k}: ${v.join(", ")}`).join(" · ") : ""; };
+const attrLine = fid => { const t = attrText(fid); return t ? `<div class="muted" style="font-size:12px">${esc(t)}</div>` : ""; };
 const isMedlineBrand = b => /^(MEDLINE(?! RENEWAL)|CURAD)\b/i.test(b || "Medline");
 const typeLabel = r => r[12] ? '<span class="pill inf" title="Kit, tray or pack; many are custom procedure packs built for one hospital">Kit/pack</span>' : "";
 const itemsIn = name => index().byTop.get(name) || [];
@@ -384,6 +388,7 @@ function renderPortfolioDetail(){
       <button class="btn ghost" id="dlc">Download CSV for Google Sheets</button>
       <span class="dlnote">Excel includes every item #${p.pseudo ? "" : ", products, new SKUs, exits"}, manufacturing sites${deep?" and the item-level deep dive":""}.</span>
     </div>
+    ${!p.pseudo && its.filter(r => !isKit(r)).length < p.fams.length / 2 ? `<p class="hint" style="margin:0;padding:10px 12px;background:var(--accent-soft);border-radius:6px">Most products in this category aren't FDA-regulated, so FDA has no item #s for them. All ${p.fams.length.toLocaleString()} medline.com products are listed under <b>Products</b> below${p.fams.some(f => attrsOf(f[0])) ? ", with their attributes from medline.com's filters" : ""}.</p>` : ""}
     <div><div class="subhead"><h3>All item #s</h3><span id="allCount"></span></div>
       <div class="fopts">
         <input class="search" id="aq" type="search" placeholder="Search item #, description, brand">
@@ -398,7 +403,7 @@ function renderPortfolioDetail(){
       <div class="subbars" style="margin-top:8px">${p.subs.map(s => `<div class="subbar"><span>${esc(s[0])}</span><span class="track"><span class="fill" style="width:${(s[1]/maxSub*100).toFixed(1)}%"></span></span><span class="cnt">${s[1]}</span></div>`).join("")}</div></div>
     <div><div class="subhead"><h3>Products</h3><span id="famCount"></span></div>
       <div class="fopts">
-        <input class="search" id="fq" type="search" placeholder="Filter products or item #s">
+        <input class="search" id="fq" type="search" placeholder="Filter products, attributes or item #s">
         <label><input type="checkbox" id="fonly"> Only products with known item #s</label>
       </div>
       <div class="tblwrap" style="max-height:520px;overflow-y:auto"><table><thead><tr><th>Product ID</th><th>Product</th><th>Subcategory</th><th>Item #s</th></tr></thead><tbody id="famRows"></tbody></table></div>
@@ -442,12 +447,12 @@ function renderPortfolioDetail(){
       const f = p.fams.filter(x => {
         const rs = itemsOfProduct(x[0]);
         if (only && !rs.length) return false;
-        return !q || (x[1]+" "+x[2]+" "+x[0]).toLowerCase().includes(q) || rs.some(r => (r[0]+" "+r[1]).toLowerCase().includes(q));
+        return !q || (x[1]+" "+x[2]+" "+x[0]+" "+attrText(x[0])).toLowerCase().includes(q) || rs.some(r => (r[0]+" "+r[1]).toLowerCase().includes(q));
       }).sort((a,b) => itemsOfProduct(b[0]).length - itemsOfProduct(a[0]).length);
       $("#famCount").textContent = `${f.length.toLocaleString()} of ${p.fams.length.toLocaleString()} · ${withItems.toLocaleString()} with item #s`;
       $("#famRows").innerHTML = f.slice(0,400).map(x => {
         const rs = itemsOfProduct(x[0]), open = openProds.has(x[0]);
-        return `<tr><td class="item"><a href="https://www.medline.com/jump/product/x/${esc(x[0])}" target="_blank" rel="noopener" style="color:inherit">${esc(x[0])}</a></td><td>${esc(x[1])}</td><td class="muted">${esc(x[2]||"—")}</td>
+        return `<tr><td class="item"><a href="https://www.medline.com/jump/product/x/${esc(x[0])}" target="_blank" rel="noopener" style="color:inherit">${esc(x[0])}</a></td><td>${esc(x[1])}${attrLine(x[0])}</td><td class="muted">${esc(x[2]||"—")}</td>
           <td>${rs.length ? `<button class="itoggle" data-fid="${esc(x[0])}" aria-expanded="${open}"><span class="chev">▸</span> ${rs.length}</button>` : '<span class="muted">—</span>'}</td></tr>`
           + (open ? `<tr class="irow"><td colspan="4"><div class="tblwrap">${itemTable(rs)}</div></td></tr>` : "");
       }).join("") + (f.length>400?`<tr><td colspan="4" class="muted">Showing the first 400. The download has all ${f.length.toLocaleString()}.</td></tr>`:"");
@@ -467,7 +472,7 @@ function skuSheet(rows, mode){
 }
 function buildRows(p){
   const nw = catSkus(p.name,"new"), gn = catSkus(p.name,"gone"), its = itemsIn(p.name), act = its.filter(r => r[3] === "N").length;
-  const fams = [["Product ID","Product","Subcategory","Known Item #s","medline.com URL"]].concat(p.fams.map(f => [f[0],f[1],f[2],itemsOfProduct(f[0]).length,"https://www.medline.com/jump/product/x/"+f[0]]));
+  const fams = [["Product ID","Product","Subcategory","Known Item #s","Attributes (medline.com filters)","medline.com URL"]].concat(p.fams.map(f => [f[0],f[1],f[2],itemsOfProduct(f[0]).length,attrText(f[0]),"https://www.medline.com/jump/product/x/"+f[0]]));
   const itemRows = [["Item #","Description","Brand","Status","Published (GUDID / NDC start)","Left Distribution Date","Medline Category","Subcategory","Product ID","Product","Category Source","FDA Product Code","FDA Device Type","Units per Pack","Country of Origin (FDA-listed sites)","Manufacturing Sites (FDA-listed)","Type","Medline Brand?"]]
     .concat(its.map(r => [r[0],r[1],r[2],r[3]==="D"?"No longer distributed":"Active",r[4],r[5],r[8],r[9],r[10],r[10]?(index().fname[r[10]]||""):"",srcName(r[11]),r[6],(DATA.pcn||{})[r[6]]||"",r[7],cooOf(r[6]).map(c=>CC[c]||c).join(", "),sitesOf(r[6]).join("; "),isKit(r)?"Kit, tray or pack":"Catalog item",isMedlineBrand(r[2])?"Yes":"No"]));
   const sites = {}; its.forEach(r => r[6] && sitesOf(r[6]).forEach(s => (sites[r[6]+"|"+s] = [r[6], (DATA.pcn||{})[r[6]]||"", s])));
@@ -491,7 +496,7 @@ async function download(p, fmt){
       const add = (rows, name, widths) => { const ws = XLSX.utils.aoa_to_sheet(rows); if (widths) ws["!cols"] = widths.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb, ws, name); };
       add(R.summary, "Summary", [44,60]);
       add(R.itemRows, "All Item Numbers", [16,60,18,20,14,14,24,28,16,40,24,10,34,12,30,70,16,10]);
-      if (!p.pseudo) add(R.fams, "Products", [16,60,34,12,50]);
+      if (!p.pseudo) add(R.fams, "Products", [16,60,34,12,80,50]);
       add(R.nw, "New SKUs (90d)", [16,50,14,14,24,28,16,40,22,10,34,34,8,30,70,18]);
       add(R.gn, "Left Distribution (90d)", [16,50,14,14,24,28,16,40,22,10,34,34,8,30,70,18]);
       add(R.siteRows, "Manufacturing Sites", [12,40,70]);
@@ -524,6 +529,7 @@ function renderMethod(){
     ["Portfolio", "Every Medline-brand product on medline.com, by Medline's 26 top-level categories and their subcategories. A product is one medline.com product page; one product usually holds several item #s."],
     ["All item #s", "Every item # Medline Industries has on file with FDA: each device record in the GUDID full release labeled by Medline Industries, plus OTC drug products in FDA's NDC directory with Medline as the labeler. Monthly GUDID updates keep it current. Items Medline doesn't have to file with FDA (some cleaning chemicals, food, office supplies) aren't included."],
     ["Item categories", "An item # found on medline.com takes its category from there. Otherwise its FDA device type and description decide it (gloves → Gloves, dressings → Wound Care, wheelchairs → DME, and so on), shown as “inferred”. Items no rule fits are listed under “Not matched to a medline.com category” by FDA device type."],
+    ["Product attributes", "For categories whose products mostly aren't FDA-regulated (Incontinence, Skin Care, Environmental Services, Nutrition, Office Supplies, Textiles, Pharmacy), each medline.com product lists the values of medline.com's own search filters, such as absorbency, material and size. medline.com doesn't publish item #s or full descriptions outside its product pages, so these attributes are the most detail available."],
     ["Kits, trays & packs", "Items whose FDA device type or description is a kit, tray or pack. Most are custom procedure packs Medline builds for a single hospital, so they're counted separately from the catalog. Each goes to the category of the procedure it serves; surgical packs go to OR/Surgery."],
     ["Brands", "Every item here is labeled by Medline Industries. “Medline brands” are items branded Medline, Medline UNITE or CURAD; the rest carry other brand names Medline labels, such as NAMIC, Centurion, Hudson RCI or Medline ReNewal (reprocessed devices)."],
     ["Item #s by product", "Opening a product shows the item #s matched to that medline.com product page. Only item #s looked up on medline.com (new SKUs) are matched to a product, so most products show none; every item # is still listed under its category."],
